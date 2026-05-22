@@ -77,6 +77,13 @@ function Shell:OnLoad()
     for index = 1, table.getn(self.areas) do
         self.areaMap[self.areas[index].key] = self.areas[index]
     end
+
+    S:RegisterEvent("BAG_UPDATE", function()
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
+    S:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function()
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
 end
 
 function Shell:Enable()
@@ -737,6 +744,7 @@ function Shell:GetPowerText(unit)
 end
 
 Shell.inventorySlotFallbacks = {
+    AmmoSlot = 0,
     HeadSlot = 1,
     NeckSlot = 2,
     ShoulderSlot = 3,
@@ -783,6 +791,7 @@ Shell.gearSlotColumns = {
         { slot = "MainHandSlot", label = "Main Hand" },
         { slot = "SecondaryHandSlot", label = "Off Hand" },
         { slot = "RangedSlot", label = "Ranged" },
+        { slot = "AmmoSlot", label = "Ammo" },
     },
 }
 
@@ -883,6 +892,58 @@ function Shell:SetQualityColor(fontString, quality)
     end
 end
 
+function Shell:HandleItemModifiedClick(link)
+    if not link or not IsModifiedClick or not HandleModifiedItemClick then
+        return false
+    end
+
+    if IsModifiedClick("CHATLINK") or IsModifiedClick("DRESSUP") or IsModifiedClick("COMPAREITEMS") then
+        return HandleModifiedItemClick(link) and true or false
+    end
+
+    return false
+end
+
+function Shell:RefreshOverviewAfterItemAction()
+    self:RefreshCharacterOverviewIfShown()
+end
+
+function Shell:RefreshCharacterOverviewIfShown()
+    if self.frame and self.frame:IsShown() and self.currentArea == "Character" and self.currentSection == "Stats" then
+        self:UpdateCharacterOverviewPanel()
+    end
+end
+
+function Shell:PickupInventorySlot(slotID)
+    if not slotID or not PickupInventoryItem then
+        return false
+    end
+
+    PickupInventoryItem(slotID)
+    self:RefreshOverviewAfterItemAction()
+    return true
+end
+
+function Shell:PickupBagSlot(bag, slot)
+    if bag == nil or not slot or not PickupContainerItem then
+        return false
+    end
+
+    PickupContainerItem(bag, slot)
+    self:RefreshOverviewAfterItemAction()
+    return true
+end
+
+function Shell:UseBagSlot(bag, slot)
+    if bag == nil or not slot or not UseContainerItem then
+        return false
+    end
+
+    UseContainerItem(bag, slot)
+    self:RefreshOverviewAfterItemAction()
+    return true
+end
+
 function Shell:CreateEquipmentRow(parent, slotInfo, width)
     local row = CreateFrame("Frame", nil, parent)
     row:SetWidth(width or 252)
@@ -893,6 +954,8 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
     icon:SetWidth(36)
     icon:SetHeight(36)
     icon:SetPoint("LEFT", row, "LEFT", 6, 0)
+    icon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    icon:RegisterForDrag("LeftButton")
     S.Theme:ApplyBackdrop(icon, "panelAlt")
     icon.slotName = slotInfo.slot
     icon.slotID = self:GetInventorySlotID(slotInfo.slot)
@@ -921,6 +984,23 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
         if GameTooltip then
             GameTooltip:Hide()
         end
+    end)
+    icon:SetScript("OnClick", function(self, button)
+        local link = GetInventoryItemLink and GetInventoryItemLink("player", self.slotID) or nil
+
+        if Shell:HandleItemModifiedClick(link) then
+            return
+        end
+
+        if button == "LeftButton" then
+            Shell:PickupInventorySlot(self.slotID)
+        end
+    end)
+    icon:SetScript("OnDragStart", function(self)
+        Shell:PickupInventorySlot(self.slotID)
+    end)
+    icon:SetScript("OnReceiveDrag", function(self)
+        Shell:PickupInventorySlot(self.slotID)
     end)
 
     local label = S.Theme:CreateFontString(row, "normal", 10, "")
@@ -1197,6 +1277,8 @@ function Shell:CreateBagButton(parent)
     local button = CreateFrame("Button", nil, parent)
     button:SetWidth(30)
     button:SetHeight(30)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForDrag("LeftButton")
     S.Theme:ApplyBackdrop(button, "panelAlt")
 
     button.texture = button:CreateTexture(nil, "ARTWORK")
@@ -1227,6 +1309,23 @@ function Shell:CreateBagButton(parent)
         if GameTooltip then
             GameTooltip:Hide()
         end
+    end)
+    button:SetScript("OnClick", function(self, mouseButton)
+        if Shell:HandleItemModifiedClick(self.link) then
+            return
+        end
+
+        if mouseButton == "RightButton" then
+            Shell:UseBagSlot(self.bag, self.slot)
+        elseif mouseButton == "LeftButton" then
+            Shell:PickupBagSlot(self.bag, self.slot)
+        end
+    end)
+    button:SetScript("OnDragStart", function(self)
+        Shell:PickupBagSlot(self.bag, self.slot)
+    end)
+    button:SetScript("OnReceiveDrag", function(self)
+        Shell:PickupBagSlot(self.bag, self.slot)
     end)
 
     return button
@@ -1431,7 +1530,7 @@ function Shell:LayoutCharacterOverviewPanel()
 
     for index = 1, table.getn(overview.weaponRows) do
         local row = overview.weaponRows[index]
-        row:SetWidth(rowWidth)
+        row:SetWidth(math.max(126, math.floor((gearWidth - 44) / table.getn(overview.weaponRows))))
         row:ClearAllPoints()
 
         if index == 1 then
