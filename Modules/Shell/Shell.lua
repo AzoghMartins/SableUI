@@ -1194,11 +1194,12 @@ function Shell:UpdateGearIcon(button)
 end
 
 function Shell:CreateBagButton(parent)
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
     button:SetWidth(30)
     button:SetHeight(30)
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForClicks("AnyUp")
     S.Theme:ApplyBackdrop(button, "panelAlt")
+    button:SetAttribute("type", "item")
 
     button.texture = button:CreateTexture(nil, "ARTWORK")
     button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
@@ -1210,29 +1211,19 @@ function Shell:CreateBagButton(parent)
     button.count:SetText("")
 
     button:SetScript("OnEnter", function(self)
-        if not self.bag or not self.slot or not GameTooltip then
+        if not GameTooltip then
             return
         end
 
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        local hasItem = GameTooltip:SetBagItem(self.bag, self.slot)
 
-        if not hasItem then
+        if self.link then
+            GameTooltip:SetHyperlink(self.link)
+        else
             GameTooltip:SetText("Empty")
         end
 
         GameTooltip:Show()
-    end)
-    button:SetScript("OnClick", function(self)
-        if self.link and IsModifiedClick and HandleModifiedItemClick and IsModifiedClick("CHATLINK") then
-            if HandleModifiedItemClick(self.link) then
-                return
-            end
-        end
-
-        if self.bag and self.slot and UseContainerItem then
-            UseContainerItem(self.bag, self.slot)
-        end
     end)
     button:SetScript("OnLeave", function()
         if GameTooltip then
@@ -1483,6 +1474,13 @@ function Shell:UpdateCharacterOverviewBags()
         buttons[index].bag = nil
         buttons[index].slot = nil
         buttons[index].link = nil
+
+        if not InCombatLockdown or not InCombatLockdown() then
+            buttons[index]:SetAttribute("type", nil)
+            buttons[index]:SetAttribute("bag", nil)
+            buttons[index]:SetAttribute("slot", nil)
+        end
+
         buttons[index]:Hide()
     end
 
@@ -1507,6 +1505,13 @@ function Shell:UpdateCharacterOverviewBags()
                 button.bag = bag
                 button.slot = slot
                 button.link = link
+
+                if not InCombatLockdown or not InCombatLockdown() then
+                    button:SetAttribute("type", link and "item" or nil)
+                    button:SetAttribute("bag", bag)
+                    button:SetAttribute("slot", slot)
+                end
+
                 button:ClearAllPoints()
                 button:SetPoint("TOPLEFT", overview.inventory, "TOPLEFT", 10 + (column * 34), -30 - (row * 34))
                 button.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
