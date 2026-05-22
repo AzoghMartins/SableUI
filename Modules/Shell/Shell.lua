@@ -1262,40 +1262,60 @@ function Shell:CreateCharacterOverviewPanel()
 
     local gear = CreateFrame("Frame", nil, panel)
     gear:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
-    gear:SetPoint("BOTTOM", panel, "BOTTOM", 0, 132)
-    gear:SetWidth(320)
+    gear:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, 196)
+    gear:SetWidth(620)
     S.Theme:ApplyBackdrop(gear, "panel")
 
     local gearTitle = S.Theme:CreateFontString(gear, "bold", 12, "")
     gearTitle:SetPoint("TOPLEFT", gear, "TOPLEFT", 10, -8)
     gearTitle:SetText("Equipment")
 
-    local allSlots = {}
+    local leftRows = {}
 
-    local gearColumnOrder = { "left", "right", "bottom" }
-
-    for orderIndex = 1, table.getn(gearColumnOrder) do
-        local slots = self.gearSlotColumns[gearColumnOrder[orderIndex]]
-
-        for index = 1, table.getn(slots) do
-            table.insert(allSlots, slots[index])
-        end
+    for index = 1, table.getn(self.gearSlotColumns.left) do
+        leftRows[index] = self:CreateEquipmentRow(gear, self.gearSlotColumns.left[index], 170)
     end
 
-    local gearButtons = {}
+    local rightRows = {}
 
-    for index = 1, table.getn(allSlots) do
-        local button = self:CreateGearIcon(gear, allSlots[index])
-        local column = (index - 1) % 3
-        local row = math.floor((index - 1) / 3)
-        button:SetPoint("TOPLEFT", gear, "TOPLEFT", 10 + (column * 100), -30 - (row * 52))
-        gearButtons[index] = button
+    for index = 1, table.getn(self.gearSlotColumns.right) do
+        rightRows[index] = self:CreateEquipmentRow(gear, self.gearSlotColumns.right[index], 170)
+    end
+
+    local weaponRows = {}
+
+    for index = 1, table.getn(self.gearSlotColumns.bottom) do
+        weaponRows[index] = self:CreateEquipmentRow(gear, self.gearSlotColumns.bottom[index], 170)
+    end
+
+    local modelPanel = CreateFrame("Frame", nil, gear)
+    modelPanel:SetWidth(220)
+    modelPanel:SetHeight(312)
+    S.Theme:ApplyBackdrop(modelPanel, "panelAlt")
+
+    local modelText = S.Theme:CreateFontString(modelPanel, "normal", 11, "")
+    modelText:SetPoint("CENTER", modelPanel, "CENTER", 0, 0)
+    modelText:SetJustifyH("CENTER")
+    modelText:SetText("Model preview unavailable")
+    S.Theme:ApplyTextColor(modelText, "textMuted")
+
+    local ok, model = pcall(function()
+        return CreateFrame("PlayerModel", nil, modelPanel)
+    end)
+
+    if ok and model then
+        model:SetPoint("TOPLEFT", modelPanel, "TOPLEFT", 6, -6)
+        model:SetPoint("BOTTOMRIGHT", modelPanel, "BOTTOMRIGHT", -6, 6)
+        model:SetUnit("player")
+        modelText:Hide()
+    else
+        model = nil
     end
 
     local inventory = CreateFrame("Frame", nil, panel)
     inventory:SetPoint("TOPLEFT", gear, "TOPRIGHT", 12, 0)
     inventory:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
-    inventory:SetPoint("BOTTOM", panel, "BOTTOM", 0, 132)
+    inventory:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 196)
     S.Theme:ApplyBackdrop(inventory, "panel")
 
     local inventoryTitle = S.Theme:CreateFontString(inventory, "bold", 12, "")
@@ -1315,28 +1335,136 @@ function Shell:CreateCharacterOverviewPanel()
         button:Hide()
     end
 
-    local summary = self:CreateStatGroup(panel, "Summary", 4, 150, 112)
+    local summary = self:CreateStatGroup(panel, "Summary", 6, 150, 182)
     summary:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, 0)
 
-    local combat = self:CreateStatGroup(panel, "Combat", 4, 150, 112)
-    combat:SetPoint("LEFT", summary, "RIGHT", 8, 0)
+    local attributes = self:CreateStatGroup(panel, "Attributes", 5, 150, 182)
+    attributes:SetPoint("LEFT", summary, "RIGHT", 8, 0)
 
-    local progression = self:CreateStatGroup(panel, "Progression", 4, 180, 112)
-    progression:SetPoint("LEFT", combat, "RIGHT", 8, 0)
+    local combat = self:CreateStatGroup(panel, "Combat", 8, 150, 182)
+    combat:SetPoint("LEFT", attributes, "RIGHT", 8, 0)
 
-    local challenges = self:CreateStatGroup(panel, "Challenge Modes", 4, 150, 112)
+    local defense = self:CreateStatGroup(panel, "Defense", 6, 150, 182)
+    defense:SetPoint("LEFT", combat, "RIGHT", 8, 0)
+
+    local resistances = self:CreateStatGroup(panel, "Resistances", 5, 150, 182)
+    resistances:SetPoint("LEFT", defense, "RIGHT", 8, 0)
+
+    local progression = self:CreateStatGroup(panel, "Progression", 4, 150, 182)
+    progression:SetPoint("LEFT", resistances, "RIGHT", 8, 0)
+
+    local challenges = self:CreateStatGroup(panel, "Challenge Modes", 4, 150, 182)
     challenges:SetPoint("LEFT", progression, "RIGHT", 8, 0)
 
     self.characterOverview = {
-        gearButtons = gearButtons,
-        bagButtons = bagButtons,
+        gear = gear,
         inventory = inventory,
+        leftRows = leftRows,
+        rightRows = rightRows,
+        weaponRows = weaponRows,
+        modelPanel = modelPanel,
+        model = model,
+        bagButtons = bagButtons,
         inventorySummary = inventorySummary,
         summary = summary,
+        attributes = attributes,
         combat = combat,
+        defense = defense,
+        resistances = resistances,
         progression = progression,
         challenges = challenges,
+        statGroups = {
+            summary,
+            attributes,
+            combat,
+            defense,
+            resistances,
+            progression,
+            challenges,
+        },
     }
+end
+
+function Shell:LayoutOverviewEquipmentRows(rows, anchorFrame, point, relativePoint, xOffset, rowWidth)
+    local previous
+
+    for index = 1, table.getn(rows) do
+        local row = rows[index]
+        row:SetWidth(rowWidth)
+        row:ClearAllPoints()
+
+        if previous then
+            row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -6)
+        else
+            row:SetPoint(point, anchorFrame, relativePoint, xOffset, -30)
+        end
+
+        previous = row
+    end
+end
+
+function Shell:LayoutCharacterOverviewPanel()
+    local overview = self.characterOverview
+
+    if not overview then
+        return
+    end
+
+    local panelWidth = self.characterOverviewPanel:GetWidth() or 1180
+    local topBottomOffset = 206
+    local gearWidth = math.floor((panelWidth - 12) * 0.5)
+
+    gearWidth = Clamp(gearWidth, 520, 760)
+
+    overview.gear:SetWidth(gearWidth)
+    overview.gear:ClearAllPoints()
+    overview.gear:SetPoint("TOPLEFT", self.characterOverviewPanel, "TOPLEFT", 0, 0)
+    overview.gear:SetPoint("BOTTOMLEFT", self.characterOverviewPanel, "BOTTOMLEFT", 0, topBottomOffset)
+
+    overview.inventory:ClearAllPoints()
+    overview.inventory:SetPoint("TOPLEFT", overview.gear, "TOPRIGHT", 12, 0)
+    overview.inventory:SetPoint("TOPRIGHT", self.characterOverviewPanel, "TOPRIGHT", 0, 0)
+    overview.inventory:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
+
+    local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
+    local modelWidth = math.max(180, gearWidth - (rowWidth * 2) - 44)
+
+    self:LayoutOverviewEquipmentRows(overview.leftRows, overview.gear, "TOPLEFT", "TOPLEFT", 10, rowWidth)
+    self:LayoutOverviewEquipmentRows(overview.rightRows, overview.gear, "TOPRIGHT", "TOPRIGHT", -10, rowWidth)
+
+    overview.modelPanel:SetWidth(modelWidth)
+    overview.modelPanel:ClearAllPoints()
+    overview.modelPanel:SetPoint("TOP", overview.gear, "TOP", 0, -30)
+    overview.modelPanel:SetPoint("BOTTOM", overview.gear, "BOTTOM", 0, 70)
+
+    for index = 1, table.getn(overview.weaponRows) do
+        local row = overview.weaponRows[index]
+        row:SetWidth(rowWidth)
+        row:ClearAllPoints()
+
+        if index == 1 then
+            row:SetPoint("BOTTOMLEFT", overview.gear, "BOTTOMLEFT", 10, 12)
+        else
+            row:SetPoint("LEFT", overview.weaponRows[index - 1], "RIGHT", 8, 0)
+        end
+    end
+
+    local cardGap = 8
+    local cardWidth = math.floor((panelWidth - (cardGap * 6)) / 7)
+
+    cardWidth = math.max(128, cardWidth)
+
+    for index = 1, table.getn(overview.statGroups) do
+        local group = overview.statGroups[index]
+        group:SetWidth(cardWidth)
+        group:ClearAllPoints()
+
+        if index == 1 then
+            group:SetPoint("BOTTOMLEFT", self.characterOverviewPanel, "BOTTOMLEFT", 0, 0)
+        else
+            group:SetPoint("LEFT", overview.statGroups[index - 1], "RIGHT", cardGap, 0)
+        end
+    end
 end
 
 function Shell:UpdateCharacterOverviewBags()
@@ -1346,7 +1474,10 @@ function Shell:UpdateCharacterOverviewBags()
     local buttonIndex = 1
     local freeSlots = 0
     local totalSlots = 0
-    local columns = 10
+    local inventoryWidth = overview.inventory:GetWidth() or 340
+    local columns = math.floor((inventoryWidth - 20) / 34)
+
+    columns = Clamp(columns, 1, 18)
 
     for index = 1, table.getn(buttons) do
         buttons[index].bag = nil
@@ -1397,19 +1528,9 @@ function Shell:UpdateCharacterOverviewBags()
     overview.inventorySummary:SetText(tostring(freeSlots) .. " free / " .. tostring(totalSlots))
 end
 
-function Shell:UpdateCharacterOverviewPanel()
-    self:CreateCharacterOverviewPanel()
-
-    local overview = self.characterOverview
-    local totals = {
-        slots = 0,
-        equipped = 0,
-        itemLevel = 0,
-        itemLevelCount = 0,
-    }
-
-    for index = 1, table.getn(overview.gearButtons) do
-        local item = self:UpdateGearIcon(overview.gearButtons[index])
+function Shell:UpdateOverviewEquipmentRows(rows, totals)
+    for index = 1, table.getn(rows) do
+        local item = self:UpdateEquipmentRow(rows[index])
         totals.slots = totals.slots + 1
 
         if item and item.link then
@@ -1421,28 +1542,83 @@ function Shell:UpdateCharacterOverviewPanel()
             totals.itemLevelCount = totals.itemLevelCount + 1
         end
     end
+end
+
+function Shell:UpdateCharacterOverviewPanel()
+    self:CreateCharacterOverviewPanel()
+
+    local overview = self.characterOverview
+    self:LayoutCharacterOverviewPanel()
+
+    local totals = {
+        slots = 0,
+        equipped = 0,
+        itemLevel = 0,
+        itemLevelCount = 0,
+    }
+
+    self:UpdateOverviewEquipmentRows(overview.leftRows, totals)
+    self:UpdateOverviewEquipmentRows(overview.rightRows, totals)
+    self:UpdateOverviewEquipmentRows(overview.weaponRows, totals)
+
+    if overview.model and overview.model.SetUnit then
+        overview.model:SetUnit("player")
+    end
 
     self:UpdateCharacterOverviewBags()
 
     local name = S.Utils.GetUnitName("player") or "-"
     local level = UnitLevel and UnitLevel("player") or nil
     local class = UnitClass and UnitClass("player") or "-"
+    local race = UnitRace and UnitRace("player") or "-"
+    local faction = UnitFactionGroup and UnitFactionGroup("player") or "-"
     local health = self:FormatPair(UnitHealth and UnitHealth("player") or nil, UnitHealthMax and UnitHealthMax("player") or nil)
     local average = "-"
+    local armor = "-"
 
     if totals.itemLevelCount > 0 then
         average = self:FormatNumber(totals.itemLevel / totals.itemLevelCount)
     end
 
+    if UnitArmor then
+        local _, effective = UnitArmor("player")
+        armor = self:FormatNumber(effective)
+    end
+
     self:SetStatRow(overview.summary, 1, "Name", name)
     self:SetStatRow(overview.summary, 2, "Level", self:FormatNumber(level))
-    self:SetStatRow(overview.summary, 3, "Class", class)
-    self:SetStatRow(overview.summary, 4, "Equipped", tostring(totals.equipped) .. " / " .. tostring(totals.slots))
+    self:SetStatRow(overview.summary, 3, "Race", race)
+    self:SetStatRow(overview.summary, 4, "Class", class)
+    self:SetStatRow(overview.summary, 5, "Faction", faction)
+    self:SetStatRow(overview.summary, 6, "Health", health)
 
-    self:SetStatRow(overview.combat, 1, "Health", health)
-    self:SetStatRow(overview.combat, 2, "Power", self:GetPowerText("player"))
-    self:SetStatRow(overview.combat, 3, "Avg Item Level", average)
-    self:SetStatRow(overview.combat, 4, "Attack Power", self:GetAttackPower())
+    self:SetStatRow(overview.attributes, 1, "Strength", self:GetEffectiveStat(1))
+    self:SetStatRow(overview.attributes, 2, "Agility", self:GetEffectiveStat(2))
+    self:SetStatRow(overview.attributes, 3, "Stamina", self:GetEffectiveStat(3))
+    self:SetStatRow(overview.attributes, 4, "Intellect", self:GetEffectiveStat(4))
+    self:SetStatRow(overview.attributes, 5, "Spirit", self:GetEffectiveStat(5))
+
+    self:SetStatRow(overview.combat, 1, "Power", self:GetPowerText("player"))
+    self:SetStatRow(overview.combat, 2, "Attack Power", self:GetAttackPower())
+    self:SetStatRow(overview.combat, 3, "Melee Crit", GetCritChance and self:FormatPercent(GetCritChance()) or "-")
+    self:SetStatRow(overview.combat, 4, "Melee Hit", self:GetCombatRatingBonus("CR_HIT_MELEE"))
+    self:SetStatRow(overview.combat, 5, "Melee Haste", GetMeleeHaste and self:FormatPercent(GetMeleeHaste()) or "-")
+    self:SetStatRow(overview.combat, 6, "Spell Power", self:GetSpellPower())
+    self:SetStatRow(overview.combat, 7, "Healing", GetSpellBonusHealing and self:FormatNumber(GetSpellBonusHealing()) or "-")
+    self:SetStatRow(overview.combat, 8, "Spell Hit", self:GetCombatRatingBonus("CR_HIT_SPELL"))
+
+    self:SetStatRow(overview.defense, 1, "Equipped", tostring(totals.equipped) .. " / " .. tostring(totals.slots))
+    self:SetStatRow(overview.defense, 2, "Avg Item Level", average)
+    self:SetStatRow(overview.defense, 3, "Armor", armor)
+    self:SetStatRow(overview.defense, 4, "Dodge", GetDodgeChance and self:FormatPercent(GetDodgeChance()) or "-")
+    self:SetStatRow(overview.defense, 5, "Parry", GetParryChance and self:FormatPercent(GetParryChance()) or "-")
+    self:SetStatRow(overview.defense, 6, "Block", GetBlockChance and self:FormatPercent(GetBlockChance()) or "-")
+
+    self:SetStatRow(overview.resistances, 1, "Fire", self:GetResistance(2))
+    self:SetStatRow(overview.resistances, 2, "Nature", self:GetResistance(3))
+    self:SetStatRow(overview.resistances, 3, "Frost", self:GetResistance(4))
+    self:SetStatRow(overview.resistances, 4, "Shadow", self:GetResistance(5))
+    self:SetStatRow(overview.resistances, 5, "Arcane", self:GetResistance(6))
 
     local progression = S.Progression and S.Progression:GetDisplayData(name) or nil
     local tierText = progression and progression.tier or "Unknown"
