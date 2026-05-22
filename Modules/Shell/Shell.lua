@@ -726,6 +726,56 @@ function Shell:GetPowerText(unit)
     return self:FormatPair(current, maximum)
 end
 
+Shell.inventorySlotFallbacks = {
+    HeadSlot = 1,
+    NeckSlot = 2,
+    ShoulderSlot = 3,
+    ShirtSlot = 4,
+    ChestSlot = 5,
+    WaistSlot = 6,
+    LegsSlot = 7,
+    FeetSlot = 8,
+    WristSlot = 9,
+    HandsSlot = 10,
+    Finger0Slot = 11,
+    Finger1Slot = 12,
+    Trinket0Slot = 13,
+    Trinket1Slot = 14,
+    BackSlot = 15,
+    MainHandSlot = 16,
+    SecondaryHandSlot = 17,
+    RangedSlot = 18,
+    TabardSlot = 19,
+}
+
+Shell.gearSlotColumns = {
+    left = {
+        { slot = "HeadSlot", label = "Head" },
+        { slot = "NeckSlot", label = "Neck" },
+        { slot = "ShoulderSlot", label = "Shoulders" },
+        { slot = "BackSlot", label = "Back" },
+        { slot = "ChestSlot", label = "Chest" },
+        { slot = "ShirtSlot", label = "Shirt" },
+        { slot = "TabardSlot", label = "Tabard" },
+        { slot = "WristSlot", label = "Wrist" },
+    },
+    right = {
+        { slot = "HandsSlot", label = "Hands" },
+        { slot = "WaistSlot", label = "Waist" },
+        { slot = "LegsSlot", label = "Legs" },
+        { slot = "FeetSlot", label = "Feet" },
+        { slot = "Finger0Slot", label = "Ring 1" },
+        { slot = "Finger1Slot", label = "Ring 2" },
+        { slot = "Trinket0Slot", label = "Trinket 1" },
+        { slot = "Trinket1Slot", label = "Trinket 2" },
+    },
+    bottom = {
+        { slot = "MainHandSlot", label = "Main Hand" },
+        { slot = "SecondaryHandSlot", label = "Off Hand" },
+        { slot = "RangedSlot", label = "Ranged" },
+    },
+}
+
 function Shell:CreateStatGroup(parent, title, rowCount, width, height)
     local group = CreateFrame("Frame", nil, parent)
     group:SetWidth(width or 270)
@@ -768,6 +818,296 @@ function Shell:SetStatRow(group, index, label, value)
 
     row.label:SetText(label or "")
     row.value:SetText(value or "-")
+end
+
+function Shell:GetInventorySlotID(slotName)
+    if GetInventorySlotInfo then
+        local slotID = GetInventorySlotInfo(slotName)
+
+        if slotID then
+            return slotID
+        end
+    end
+
+    return self.inventorySlotFallbacks[slotName]
+end
+
+function Shell:GetItemNameFromLink(link)
+    if not link then
+        return nil
+    end
+
+    local name
+
+    if GetItemInfo then
+        name = GetItemInfo(link)
+    end
+
+    if not name then
+        name = string.match(link, "%[(.-)%]")
+    end
+
+    return name
+end
+
+function Shell:GetItemLevelFromLink(link)
+    if not link or not GetItemInfo then
+        return nil
+    end
+
+    local _, _, _, itemLevel = GetItemInfo(link)
+    return tonumber(itemLevel)
+end
+
+function Shell:SetQualityColor(fontString, quality)
+    if not fontString then
+        return
+    end
+
+    local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+
+    if color then
+        fontString:SetTextColor(color.r, color.g, color.b)
+    else
+        S.Theme:ApplyTextColor(fontString, "textMuted")
+    end
+end
+
+function Shell:CreateEquipmentRow(parent, slotInfo, width)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetWidth(width or 252)
+    row:SetHeight(46)
+    S.Theme:ApplyBackdrop(row, "panel")
+
+    local icon = CreateFrame("Button", nil, row)
+    icon:SetWidth(36)
+    icon:SetHeight(36)
+    icon:SetPoint("LEFT", row, "LEFT", 6, 0)
+    S.Theme:ApplyBackdrop(icon, "panelAlt")
+    icon.slotName = slotInfo.slot
+    icon.slotID = self:GetInventorySlotID(slotInfo.slot)
+
+    icon.texture = icon:CreateTexture(nil, "ARTWORK")
+    icon.texture:SetPoint("TOPLEFT", icon, "TOPLEFT", 3, -3)
+    icon.texture:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -3, 3)
+    icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    icon:SetScript("OnEnter", function(self)
+        if not self.slotID or not GameTooltip then
+            return
+        end
+
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local hasItem = GameTooltip:SetInventoryItem("player", self.slotID)
+
+        if not hasItem then
+            GameTooltip:SetText(slotInfo.label)
+            GameTooltip:AddLine("Empty", 0.58, 0.57, 0.53)
+        end
+
+        GameTooltip:Show()
+    end)
+    icon:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+
+    local label = S.Theme:CreateFontString(row, "normal", 10, "")
+    label:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -5)
+    label:SetText(slotInfo.label)
+    S.Theme:ApplyTextColor(label, "textMuted")
+
+    local item = S.Theme:CreateFontString(row, "normal", 11, "")
+    item:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -5)
+    item:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    item:SetJustifyH("LEFT")
+    item:SetText("-")
+
+    row.slotInfo = slotInfo
+    row.icon = icon
+    row.label = label
+    row.item = item
+
+    return row
+end
+
+function Shell:CreateEquipmentColumn(parent, slotList, width)
+    local column = CreateFrame("Frame", nil, parent)
+    column:SetWidth(width or 258)
+    column:SetHeight((table.getn(slotList) * 46) + ((table.getn(slotList) - 1) * 6))
+    column.rows = {}
+
+    local previous
+
+    for index = 1, table.getn(slotList) do
+        local row = self:CreateEquipmentRow(column, slotList[index], width or 258)
+
+        if previous then
+            row:SetPoint("TOPLEFT", previous, "BOTTOMLEFT", 0, -6)
+        else
+            row:SetPoint("TOPLEFT", column, "TOPLEFT", 0, 0)
+        end
+
+        column.rows[index] = row
+        previous = row
+    end
+
+    return column
+end
+
+function Shell:CreateCharacterGearPanel()
+    if self.characterGearPanel then
+        return
+    end
+
+    local panel = CreateFrame("Frame", nil, self.detailContent)
+    panel:SetPoint("TOPLEFT", self.contentSubtitle, "BOTTOMLEFT", 0, -22)
+    panel:SetPoint("BOTTOMRIGHT", self.detailContent, "BOTTOMRIGHT", 0, 0)
+    panel:Hide()
+    self.characterGearPanel = panel
+    self:AddDynamicFrame(panel)
+
+    local left = self:CreateEquipmentColumn(panel, self.gearSlotColumns.left, 258)
+    left:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+
+    local right = self:CreateEquipmentColumn(panel, self.gearSlotColumns.right, 258)
+    right:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
+
+    local summary = self:CreateStatGroup(panel, "Equipment Summary", 5, 258, 128)
+    summary:SetPoint("TOP", panel, "TOP", 0, 0)
+
+    local visual = CreateFrame("Frame", nil, panel)
+    visual:SetWidth(258)
+    visual:SetHeight(236)
+    visual:SetPoint("TOP", summary, "BOTTOM", 0, -14)
+    S.Theme:ApplyBackdrop(visual, "panel")
+
+    local visualTitle = S.Theme:CreateFontString(visual, "bold", 12, "")
+    visualTitle:SetPoint("TOPLEFT", visual, "TOPLEFT", 10, -8)
+    visualTitle:SetText("Paper Doll")
+
+    local visualText = S.Theme:CreateFontString(visual, "normal", 11, "")
+    visualText:SetPoint("CENTER", visual, "CENTER", 0, 0)
+    visualText:SetJustifyH("CENTER")
+    visualText:SetText("Model preview unavailable")
+    S.Theme:ApplyTextColor(visualText, "textMuted")
+
+    local ok, model = pcall(function()
+        return CreateFrame("PlayerModel", nil, visual)
+    end)
+
+    if ok and model then
+        model:SetPoint("TOPLEFT", visual, "TOPLEFT", 8, -28)
+        model:SetPoint("BOTTOMRIGHT", visual, "BOTTOMRIGHT", -8, 8)
+        model:SetUnit("player")
+        visualText:Hide()
+    else
+        model = nil
+    end
+
+    local bottom = self:CreateEquipmentColumn(panel, self.gearSlotColumns.bottom, 258)
+    bottom:SetPoint("TOP", visual, "BOTTOM", 0, -14)
+
+    self.characterGear = {
+        left = left,
+        right = right,
+        bottom = bottom,
+        summary = summary,
+        model = model,
+    }
+end
+
+function Shell:UpdateEquipmentRow(row)
+    local slotID = row and row.icon and row.icon.slotID
+
+    if not slotID then
+        return nil
+    end
+
+    local link = GetInventoryItemLink and GetInventoryItemLink("player", slotID) or nil
+    local texture = GetInventoryItemTexture and GetInventoryItemTexture("player", slotID) or nil
+    local quality = GetInventoryItemQuality and GetInventoryItemQuality("player", slotID) or nil
+    local itemName = self:GetItemNameFromLink(link)
+    local itemLevel = self:GetItemLevelFromLink(link)
+
+    row.icon.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+    row.item:SetText(itemName or "Empty")
+    self:SetQualityColor(row.item, quality)
+
+    if link then
+        row.icon:SetAlpha(1)
+    else
+        row.icon:SetAlpha(0.55)
+    end
+
+    return {
+        link = link,
+        quality = quality,
+        itemLevel = itemLevel,
+    }
+end
+
+function Shell:UpdateEquipmentColumn(column, totals)
+    if not column or not column.rows then
+        return
+    end
+
+    for index = 1, table.getn(column.rows) do
+        local item = self:UpdateEquipmentRow(column.rows[index])
+
+        totals.slots = totals.slots + 1
+
+        if item and item.link then
+            totals.equipped = totals.equipped + 1
+        end
+
+        if item and item.itemLevel then
+            totals.itemLevel = totals.itemLevel + item.itemLevel
+            totals.itemLevelCount = totals.itemLevelCount + 1
+        end
+    end
+end
+
+function Shell:UpdateCharacterGearPanel()
+    self:CreateCharacterGearPanel()
+
+    local gear = self.characterGear
+    local totals = {
+        slots = 0,
+        equipped = 0,
+        itemLevel = 0,
+        itemLevelCount = 0,
+    }
+
+    self:UpdateEquipmentColumn(gear.left, totals)
+    self:UpdateEquipmentColumn(gear.right, totals)
+    self:UpdateEquipmentColumn(gear.bottom, totals)
+
+    local average = "-"
+
+    if totals.itemLevelCount > 0 then
+        average = self:FormatNumber(totals.itemLevel / totals.itemLevelCount)
+    end
+
+    local armor = "-"
+
+    if UnitArmor then
+        local _, effective = UnitArmor("player")
+        armor = self:FormatNumber(effective)
+    end
+
+    self:SetStatRow(gear.summary, 1, "Equipped", tostring(totals.equipped) .. " / " .. tostring(totals.slots))
+    self:SetStatRow(gear.summary, 2, "Avg Item Level", average)
+    self:SetStatRow(gear.summary, 3, "Armor", armor)
+    self:SetStatRow(gear.summary, 4, "Durability", "Pending")
+    self:SetStatRow(gear.summary, 5, "Set Bonuses", "Pending")
+
+    if gear.model and gear.model.SetUnit then
+        gear.model:SetUnit("player")
+    end
+
+    self.characterGearPanel:Show()
 end
 
 function Shell:CreateCharacterStatsPanel()
@@ -1020,6 +1360,8 @@ function Shell:RenderContent()
 
         if section == "Stats" then
             self:UpdateCharacterStatsPanel()
+        elseif section == "Gear" then
+            self:UpdateCharacterGearPanel()
         end
     else
         self.contentSubtitle:SetText("")
