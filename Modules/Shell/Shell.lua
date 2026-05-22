@@ -986,6 +986,11 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
         end
     end)
     icon:SetScript("OnClick", function(self, button)
+        if self.dragging then
+            self.dragging = nil
+            return
+        end
+
         local link = GetInventoryItemLink and GetInventoryItemLink("player", self.slotID) or nil
 
         if Shell:HandleItemModifiedClick(link) then
@@ -997,6 +1002,7 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
         end
     end)
     icon:SetScript("OnDragStart", function(self)
+        self.dragging = true
         Shell:PickupInventorySlot(self.slotID)
     end)
     icon:SetScript("OnReceiveDrag", function(self)
@@ -1274,12 +1280,13 @@ function Shell:UpdateGearIcon(button)
 end
 
 function Shell:CreateBagButton(parent)
-    local button = CreateFrame("Button", nil, parent)
+    local button = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
     button:SetWidth(30)
     button:SetHeight(30)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
     S.Theme:ApplyBackdrop(button, "panelAlt")
+    button:SetAttribute("type2", "item")
 
     button.texture = button:CreateTexture(nil, "ARTWORK")
     button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
@@ -1311,17 +1318,25 @@ function Shell:CreateBagButton(parent)
         end
     end)
     button:SetScript("OnClick", function(self, mouseButton)
-        if Shell:HandleItemModifiedClick(self.link) then
+        if self.dragging then
+            self.dragging = nil
             return
         end
 
         if mouseButton == "RightButton" then
-            Shell:UseBagSlot(self.bag, self.slot)
-        elseif mouseButton == "LeftButton" then
+            return
+        end
+
+        if Shell:HandleItemModifiedClick(self.link) then
+            return
+        end
+
+        if mouseButton == "LeftButton" then
             Shell:PickupBagSlot(self.bag, self.slot)
         end
     end)
     button:SetScript("OnDragStart", function(self)
+        self.dragging = true
         Shell:PickupBagSlot(self.bag, self.slot)
     end)
     button:SetScript("OnReceiveDrag", function(self)
@@ -1574,6 +1589,13 @@ function Shell:UpdateCharacterOverviewBags()
         buttons[index].bag = nil
         buttons[index].slot = nil
         buttons[index].link = nil
+
+        if not InCombatLockdown or not InCombatLockdown() then
+            buttons[index]:SetAttribute("type2", nil)
+            buttons[index]:SetAttribute("bag", nil)
+            buttons[index]:SetAttribute("slot", nil)
+        end
+
         buttons[index]:Hide()
     end
 
@@ -1598,6 +1620,13 @@ function Shell:UpdateCharacterOverviewBags()
                 button.bag = bag
                 button.slot = slot
                 button.link = link
+
+                if not InCombatLockdown or not InCombatLockdown() then
+                    button:SetAttribute("type2", link and "item" or nil)
+                    button:SetAttribute("bag", bag)
+                    button:SetAttribute("slot", slot)
+                end
+
                 button:ClearAllPoints()
                 button:SetPoint("TOPLEFT", overview.inventory, "TOPLEFT", 10 + (column * 34), -30 - (row * 34))
                 button.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
