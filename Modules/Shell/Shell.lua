@@ -797,12 +797,20 @@ function Shell:CreateCharacterStatsPanel()
     local resistances = self:CreateStatGroup(panel, "Resistances", 5, 276, 128)
     resistances:SetPoint("TOPLEFT", combat, "BOTTOMLEFT", 0, -14)
 
+    local progression = self:CreateStatGroup(panel, "Individual Progression", 4, 276, 110)
+    progression:SetPoint("TOPLEFT", resistances, "TOPRIGHT", 14, 0)
+
+    local challenges = self:CreateStatGroup(panel, "Challenge Modes", 4, 276, 110)
+    challenges:SetPoint("TOPLEFT", progression, "BOTTOMLEFT", 0, -14)
+
     self.characterStatGroups = {
         summary = summary,
         attributes = attributes,
         combat = combat,
         defense = defense,
         resistances = resistances,
+        progression = progression,
+        challenges = challenges,
     }
 end
 
@@ -876,6 +884,34 @@ function Shell:GetResistance(index)
     return self:FormatNumber(resistance)
 end
 
+function Shell:GetRelativeTimeText(timestamp)
+    timestamp = tonumber(timestamp)
+
+    if not timestamp or timestamp <= 0 or not time then
+        return "-"
+    end
+
+    local elapsed = time() - timestamp
+
+    if elapsed < 0 then
+        elapsed = 0
+    end
+
+    if elapsed < 60 then
+        return "just now"
+    end
+
+    if elapsed < 3600 then
+        return self:FormatNumber(elapsed / 60) .. " min ago"
+    end
+
+    if elapsed < 86400 then
+        return self:FormatNumber(elapsed / 3600) .. " hr ago"
+    end
+
+    return self:FormatNumber(elapsed / 86400) .. " days ago"
+end
+
 function Shell:UpdateCharacterStatsPanel()
     self:CreateCharacterStatsPanel()
 
@@ -927,6 +963,23 @@ function Shell:UpdateCharacterStatsPanel()
     self:SetStatRow(groups.resistances, 3, "Frost", self:GetResistance(4))
     self:SetStatRow(groups.resistances, 4, "Shadow", self:GetResistance(5))
     self:SetStatRow(groups.resistances, 5, "Arcane", self:GetResistance(6))
+
+    local progression = S.Progression and S.Progression:GetDisplayData(name) or nil
+    local tierText = progression and progression.tier or "Unknown"
+
+    if progression and progression.level ~= nil then
+        tierText = tierText .. " (" .. tostring(progression.level) .. ")"
+    end
+
+    self:SetStatRow(groups.progression, 1, "Current Tier", tierText)
+    self:SetStatRow(groups.progression, 2, "Next Objective", progression and progression.objective or "Helper pending")
+    self:SetStatRow(groups.progression, 3, "Source", progression and progression.source or "pending")
+    self:SetStatRow(groups.progression, 4, "Updated", progression and self:GetRelativeTimeText(progression.updated) or "-")
+
+    self:SetStatRow(groups.challenges, 1, "Status", "Server module pending")
+    self:SetStatRow(groups.challenges, 2, "Active Mode", "None")
+    self:SetStatRow(groups.challenges, 3, "Best Run", "-")
+    self:SetStatRow(groups.challenges, 4, "Next Reward", "-")
 
     self.characterStatsPanel:Show()
 end
