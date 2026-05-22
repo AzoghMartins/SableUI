@@ -1286,7 +1286,7 @@ function Shell:CreateCharacterOverviewPanel()
 
     for index = 1, table.getn(allSlots) do
         local button = self:CreateGearIcon(gear, allSlots[index])
-        local column = math.mod(index - 1, 3)
+        local column = (index - 1) % 3
         local row = math.floor((index - 1) / 3)
         button:SetPoint("TOPLEFT", gear, "TOPLEFT", 10 + (column * 100), -30 - (row * 52))
         gearButtons[index] = button
@@ -1370,7 +1370,7 @@ function Shell:UpdateCharacterOverviewBags()
                     texture, count = GetContainerItemInfo(bag, slot)
                 end
 
-                local column = math.mod(buttonIndex - 1, columns)
+                local column = (buttonIndex - 1) % columns
                 local row = math.floor((buttonIndex - 1) / columns)
 
                 button.bag = bag
