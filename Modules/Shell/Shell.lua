@@ -28,9 +28,7 @@ Shell.areas = {
         label = "Character",
         defaultSection = "Stats",
         sections = {
-            { key = "Stats", label = "Stats" },
-            { key = "Gear", label = "Gear" },
-            { key = "Inventory", label = "Inventory" },
+            { key = "Stats", label = "Overview" },
             { key = "Skills", label = "Skills" },
             { key = "Talents", label = "Talents" },
             { key = "Pets", label = "Pets" },
@@ -349,6 +347,18 @@ function Shell:ShowArea(areaKey)
     self:BuildLeftTabs(area)
 
     local section = settings.lastSections[area.key] or area.defaultSection
+    local sectionFound = false
+
+    for index = 1, table.getn(area.sections) do
+        if area.sections[index].key == section then
+            sectionFound = true
+            break
+        end
+    end
+
+    if not sectionFound then
+        section = area.defaultSection
+    end
 
     if area.usesMembers then
         self:RefreshRoster()
@@ -1110,6 +1120,350 @@ function Shell:UpdateCharacterGearPanel()
     self.characterGearPanel:Show()
 end
 
+function Shell:CreateGearIcon(parent, slotInfo)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetWidth(96)
+    button:SetHeight(48)
+    S.Theme:ApplyBackdrop(button, "panel")
+    button.slotInfo = slotInfo
+    button.slotID = self:GetInventorySlotID(slotInfo.slot)
+
+    button.texture = button:CreateTexture(nil, "ARTWORK")
+    button.texture:SetWidth(32)
+    button.texture:SetHeight(32)
+    button.texture:SetPoint("LEFT", button, "LEFT", 7, 0)
+    button.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button.label = S.Theme:CreateFontString(button, "normal", 10, "")
+    button.label:SetPoint("TOPLEFT", button.texture, "TOPRIGHT", 7, -1)
+    button.label:SetText(slotInfo.label)
+    S.Theme:ApplyTextColor(button.label, "textMuted")
+
+    button.item = S.Theme:CreateFontString(button, "normal", 10, "")
+    button.item:SetPoint("TOPLEFT", button.label, "BOTTOMLEFT", 0, -5)
+    button.item:SetPoint("RIGHT", button, "RIGHT", -6, 0)
+    button.item:SetJustifyH("LEFT")
+    button.item:SetText("-")
+
+    button:SetScript("OnEnter", function(self)
+        if not self.slotID or not GameTooltip then
+            return
+        end
+
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local hasItem = GameTooltip:SetInventoryItem("player", self.slotID)
+
+        if not hasItem then
+            GameTooltip:SetText(slotInfo.label)
+            GameTooltip:AddLine("Empty", 0.58, 0.57, 0.53)
+        end
+
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+
+    return button
+end
+
+function Shell:UpdateGearIcon(button)
+    local slotID = button and button.slotID
+
+    if not slotID then
+        return nil
+    end
+
+    local link = GetInventoryItemLink and GetInventoryItemLink("player", slotID) or nil
+    local texture = GetInventoryItemTexture and GetInventoryItemTexture("player", slotID) or nil
+    local quality = GetInventoryItemQuality and GetInventoryItemQuality("player", slotID) or nil
+    local itemName = self:GetItemNameFromLink(link)
+    local itemLevel = self:GetItemLevelFromLink(link)
+
+    button.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+    button.item:SetText(itemName or "Empty")
+    self:SetQualityColor(button.item, quality)
+    button:SetAlpha(link and 1 or 0.58)
+
+    return {
+        link = link,
+        itemLevel = itemLevel,
+    }
+end
+
+function Shell:CreateBagButton(parent)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetWidth(30)
+    button:SetHeight(30)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    S.Theme:ApplyBackdrop(button, "panelAlt")
+
+    button.texture = button:CreateTexture(nil, "ARTWORK")
+    button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
+    button.texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
+    button.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button.count = S.Theme:CreateFontString(button, "normal", 9, "OUTLINE")
+    button.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 1)
+    button.count:SetText("")
+
+    button:SetScript("OnEnter", function(self)
+        if not self.bag or not self.slot or not GameTooltip then
+            return
+        end
+
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local hasItem = GameTooltip:SetBagItem(self.bag, self.slot)
+
+        if not hasItem then
+            GameTooltip:SetText("Empty")
+        end
+
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnClick", function(self)
+        if self.link and IsModifiedClick and HandleModifiedItemClick and IsModifiedClick("CHATLINK") then
+            if HandleModifiedItemClick(self.link) then
+                return
+            end
+        end
+
+        if self.bag and self.slot and UseContainerItem then
+            UseContainerItem(self.bag, self.slot)
+        end
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+
+    return button
+end
+
+function Shell:GetBagRange()
+    local lastBag = NUM_BAG_SLOTS or 4
+    return 0, lastBag
+end
+
+function Shell:CreateCharacterOverviewPanel()
+    if self.characterOverviewPanel then
+        return
+    end
+
+    local panel = CreateFrame("Frame", nil, self.detailContent)
+    panel:SetPoint("TOPLEFT", self.contentSubtitle, "BOTTOMLEFT", 0, -22)
+    panel:SetPoint("BOTTOMRIGHT", self.detailContent, "BOTTOMRIGHT", 0, 0)
+    panel:Hide()
+    self.characterOverviewPanel = panel
+    self:AddDynamicFrame(panel)
+
+    local gear = CreateFrame("Frame", nil, panel)
+    gear:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+    gear:SetPoint("BOTTOM", panel, "BOTTOM", 0, 132)
+    gear:SetWidth(320)
+    S.Theme:ApplyBackdrop(gear, "panel")
+
+    local gearTitle = S.Theme:CreateFontString(gear, "bold", 12, "")
+    gearTitle:SetPoint("TOPLEFT", gear, "TOPLEFT", 10, -8)
+    gearTitle:SetText("Equipment")
+
+    local allSlots = {}
+
+    local gearColumnOrder = { "left", "right", "bottom" }
+
+    for orderIndex = 1, table.getn(gearColumnOrder) do
+        local slots = self.gearSlotColumns[gearColumnOrder[orderIndex]]
+
+        for index = 1, table.getn(slots) do
+            table.insert(allSlots, slots[index])
+        end
+    end
+
+    local gearButtons = {}
+
+    for index = 1, table.getn(allSlots) do
+        local button = self:CreateGearIcon(gear, allSlots[index])
+        local column = math.mod(index - 1, 3)
+        local row = math.floor((index - 1) / 3)
+        button:SetPoint("TOPLEFT", gear, "TOPLEFT", 10 + (column * 100), -30 - (row * 52))
+        gearButtons[index] = button
+    end
+
+    local inventory = CreateFrame("Frame", nil, panel)
+    inventory:SetPoint("TOPLEFT", gear, "TOPRIGHT", 12, 0)
+    inventory:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
+    inventory:SetPoint("BOTTOM", panel, "BOTTOM", 0, 132)
+    S.Theme:ApplyBackdrop(inventory, "panel")
+
+    local inventoryTitle = S.Theme:CreateFontString(inventory, "bold", 12, "")
+    inventoryTitle:SetPoint("TOPLEFT", inventory, "TOPLEFT", 10, -8)
+    inventoryTitle:SetText("Inventory")
+
+    local inventorySummary = S.Theme:CreateFontString(inventory, "normal", 11, "")
+    inventorySummary:SetPoint("TOPRIGHT", inventory, "TOPRIGHT", -10, -9)
+    inventorySummary:SetText("")
+    S.Theme:ApplyTextColor(inventorySummary, "textMuted")
+
+    local bagButtons = {}
+
+    for index = 1, 120 do
+        local button = self:CreateBagButton(inventory)
+        bagButtons[index] = button
+        button:Hide()
+    end
+
+    local summary = self:CreateStatGroup(panel, "Summary", 4, 150, 112)
+    summary:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, 0)
+
+    local combat = self:CreateStatGroup(panel, "Combat", 4, 150, 112)
+    combat:SetPoint("LEFT", summary, "RIGHT", 8, 0)
+
+    local progression = self:CreateStatGroup(panel, "Progression", 4, 180, 112)
+    progression:SetPoint("LEFT", combat, "RIGHT", 8, 0)
+
+    local challenges = self:CreateStatGroup(panel, "Challenge Modes", 4, 150, 112)
+    challenges:SetPoint("LEFT", progression, "RIGHT", 8, 0)
+
+    self.characterOverview = {
+        gearButtons = gearButtons,
+        bagButtons = bagButtons,
+        inventory = inventory,
+        inventorySummary = inventorySummary,
+        summary = summary,
+        combat = combat,
+        progression = progression,
+        challenges = challenges,
+    }
+end
+
+function Shell:UpdateCharacterOverviewBags()
+    local overview = self.characterOverview
+    local buttons = overview.bagButtons
+    local firstBag, lastBag = self:GetBagRange()
+    local buttonIndex = 1
+    local freeSlots = 0
+    local totalSlots = 0
+    local columns = 10
+
+    for index = 1, table.getn(buttons) do
+        buttons[index].bag = nil
+        buttons[index].slot = nil
+        buttons[index].link = nil
+        buttons[index]:Hide()
+    end
+
+    for bag = firstBag, lastBag do
+        local slots = GetContainerNumSlots and GetContainerNumSlots(bag) or 0
+
+        for slot = 1, slots do
+            local button = buttons[buttonIndex]
+            local link = GetContainerItemLink and GetContainerItemLink(bag, slot) or nil
+
+            if button then
+                local texture
+                local count
+
+                if GetContainerItemInfo then
+                    texture, count = GetContainerItemInfo(bag, slot)
+                end
+
+                local column = math.mod(buttonIndex - 1, columns)
+                local row = math.floor((buttonIndex - 1) / columns)
+
+                button.bag = bag
+                button.slot = slot
+                button.link = link
+                button:ClearAllPoints()
+                button:SetPoint("TOPLEFT", overview.inventory, "TOPLEFT", 10 + (column * 34), -30 - (row * 34))
+                button.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+                button.count:SetText(count and count > 1 and tostring(count) or "")
+                button:SetAlpha(link and 1 or 0.35)
+                button:Show()
+
+                buttonIndex = buttonIndex + 1
+            end
+
+            totalSlots = totalSlots + 1
+
+            if not link then
+                freeSlots = freeSlots + 1
+            end
+        end
+    end
+
+    overview.inventorySummary:SetText(tostring(freeSlots) .. " free / " .. tostring(totalSlots))
+end
+
+function Shell:UpdateCharacterOverviewPanel()
+    self:CreateCharacterOverviewPanel()
+
+    local overview = self.characterOverview
+    local totals = {
+        slots = 0,
+        equipped = 0,
+        itemLevel = 0,
+        itemLevelCount = 0,
+    }
+
+    for index = 1, table.getn(overview.gearButtons) do
+        local item = self:UpdateGearIcon(overview.gearButtons[index])
+        totals.slots = totals.slots + 1
+
+        if item and item.link then
+            totals.equipped = totals.equipped + 1
+        end
+
+        if item and item.itemLevel then
+            totals.itemLevel = totals.itemLevel + item.itemLevel
+            totals.itemLevelCount = totals.itemLevelCount + 1
+        end
+    end
+
+    self:UpdateCharacterOverviewBags()
+
+    local name = S.Utils.GetUnitName("player") or "-"
+    local level = UnitLevel and UnitLevel("player") or nil
+    local class = UnitClass and UnitClass("player") or "-"
+    local health = self:FormatPair(UnitHealth and UnitHealth("player") or nil, UnitHealthMax and UnitHealthMax("player") or nil)
+    local average = "-"
+
+    if totals.itemLevelCount > 0 then
+        average = self:FormatNumber(totals.itemLevel / totals.itemLevelCount)
+    end
+
+    self:SetStatRow(overview.summary, 1, "Name", name)
+    self:SetStatRow(overview.summary, 2, "Level", self:FormatNumber(level))
+    self:SetStatRow(overview.summary, 3, "Class", class)
+    self:SetStatRow(overview.summary, 4, "Equipped", tostring(totals.equipped) .. " / " .. tostring(totals.slots))
+
+    self:SetStatRow(overview.combat, 1, "Health", health)
+    self:SetStatRow(overview.combat, 2, "Power", self:GetPowerText("player"))
+    self:SetStatRow(overview.combat, 3, "Avg Item Level", average)
+    self:SetStatRow(overview.combat, 4, "Attack Power", self:GetAttackPower())
+
+    local progression = S.Progression and S.Progression:GetDisplayData(name) or nil
+    local tierText = progression and progression.tier or "Unknown"
+
+    if progression and progression.level ~= nil then
+        tierText = tierText .. " (" .. tostring(progression.level) .. ")"
+    end
+
+    self:SetStatRow(overview.progression, 1, "Current Tier", tierText)
+    self:SetStatRow(overview.progression, 2, "Next Objective", progression and progression.objective or "Helper pending")
+    self:SetStatRow(overview.progression, 3, "Source", progression and progression.source or "pending")
+    self:SetStatRow(overview.progression, 4, "Updated", progression and self:GetRelativeTimeText(progression.updated) or "-")
+
+    self:SetStatRow(overview.challenges, 1, "Status", "Server module pending")
+    self:SetStatRow(overview.challenges, 2, "Active Mode", "None")
+    self:SetStatRow(overview.challenges, 3, "Best Run", "-")
+    self:SetStatRow(overview.challenges, 4, "Next Reward", "-")
+
+    self.characterOverviewPanel:Show()
+end
+
 function Shell:CreateCharacterStatsPanel()
     if self.characterStatsPanel then
         return
@@ -1358,10 +1712,8 @@ function Shell:RenderContent()
         local name = S.Utils.GetUnitName("player") or "Character"
         self.contentSubtitle:SetText(name)
 
-        if section == "Stats" then
-            self:UpdateCharacterStatsPanel()
-        elseif section == "Gear" then
-            self:UpdateCharacterGearPanel()
+        if section == "Stats" or section == "Gear" or section == "Inventory" then
+            self:UpdateCharacterOverviewPanel()
         end
     else
         self.contentSubtitle:SetText("")
