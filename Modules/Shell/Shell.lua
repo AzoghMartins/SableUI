@@ -522,8 +522,6 @@ function Shell:HideDynamicContent()
     for index = 1, table.getn(self.dynamicFrames or {}) do
         self.dynamicFrames[index]:Hide()
     end
-
-    self:HideSecureUseButton()
 end
 
 function Shell:AddDynamicFrame(frame)
@@ -946,106 +944,6 @@ function Shell:UseBagSlot(bag, slot)
     return true
 end
 
-function Shell:GetSecureItemAttribute(link)
-    if not link then
-        return nil
-    end
-
-    local itemID = string.match(link, "item:(%d+)")
-
-    if itemID then
-        return "item:" .. itemID
-    end
-
-    return link
-end
-
-function Shell:HideSecureUseButton()
-    if self.secureUseButton then
-        self.secureUseButton:Hide()
-        self.secureUseButton.sourceButton = nil
-    end
-end
-
-function Shell:CreateSecureUseButton()
-    if self.secureUseButton then
-        return
-    end
-
-    local button = CreateFrame("Button", "SableUISecureInventoryUseButton", UIParent, "SecureActionButtonTemplate")
-    button:SetWidth(18)
-    button:SetHeight(18)
-    button:SetFrameStrata("TOOLTIP")
-    button:SetToplevel(true)
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    button:Hide()
-    S.Theme:ApplyBackdrop(button, "panelAlt")
-
-    button.texture = button:CreateTexture(nil, "ARTWORK")
-    button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
-    button.texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
-    button.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    button:SetScript("OnEnter", function(self)
-        if not GameTooltip then
-            return
-        end
-
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-
-        if self.link then
-            GameTooltip:SetHyperlink(self.link)
-            GameTooltip:AddLine("Click to use", 0.79, 0.58, 0.29)
-        else
-            GameTooltip:SetText("Use")
-        end
-
-        GameTooltip:Show()
-    end)
-    button:SetScript("OnLeave", function()
-        if GameTooltip then
-            GameTooltip:Hide()
-        end
-
-        Shell:HideSecureUseButton()
-    end)
-    button:SetScript("PostClick", function()
-        Shell:RefreshOverviewAfterItemAction()
-    end)
-
-    self.secureUseButton = button
-end
-
-function Shell:ShowSecureUseButton(sourceButton)
-    self:CreateSecureUseButton()
-
-    local button = self.secureUseButton
-    local secureItem = self:GetSecureItemAttribute(sourceButton and sourceButton.link)
-
-    if not sourceButton or not secureItem then
-        self:HideSecureUseButton()
-        return false
-    end
-
-    if InCombatLockdown and InCombatLockdown() then
-        self:HideSecureUseButton()
-        return false
-    end
-
-    button.sourceButton = sourceButton
-    button.link = sourceButton.link
-    button.texture:SetTexture(sourceButton.texture and sourceButton.texture:GetTexture() or "Interface\\Icons\\INV_Misc_QuestionMark")
-    button:SetAttribute("type1", "item")
-    button:SetAttribute("item1", secureItem)
-    button:SetAttribute("type2", "item")
-    button:SetAttribute("item2", secureItem)
-    button:ClearAllPoints()
-    button:SetPoint("TOPRIGHT", sourceButton, "TOPRIGHT", 3, 3)
-    button:Show()
-
-    return true
-end
-
 function Shell:CreateEquipmentRow(parent, slotInfo, width)
     local row = CreateFrame("Frame", nil, parent)
     row:SetWidth(width or 252)
@@ -1382,66 +1280,24 @@ function Shell:UpdateGearIcon(button)
 end
 
 function Shell:CreateBagButton(parent)
-    local button = CreateFrame("Button", nil, parent)
+    self.bagButtonIndex = (self.bagButtonIndex or 0) + 1
+
+    local name = "SableUIBagSlot" .. tostring(self.bagButtonIndex)
+    local button = CreateFrame("CheckButton", name, parent, "ContainerFrameItemButtonTemplate")
     button:SetWidth(30)
     button:SetHeight(30)
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    button:RegisterForDrag("LeftButton")
     S.Theme:ApplyBackdrop(button, "panelAlt")
 
-    button.texture = button:CreateTexture(nil, "ARTWORK")
+    button:SetNormalTexture(nil)
+    button:SetCheckedTexture(nil)
+    button.texture = _G[name .. "IconTexture"] or button:CreateTexture(nil, "ARTWORK")
     button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
     button.texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
     button.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    button.count = S.Theme:CreateFontString(button, "normal", 9, "OUTLINE")
+    button.count = _G[name .. "Count"] or S.Theme:CreateFontString(button, "normal", 9, "OUTLINE")
+    button.count:ClearAllPoints()
     button.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 1)
-    button.count:SetText("")
-
-    button:SetScript("OnEnter", function(self)
-        if not GameTooltip then
-            return
-        end
-
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-
-        if self.link then
-            GameTooltip:SetHyperlink(self.link)
-        else
-            GameTooltip:SetText("Empty")
-        end
-
-        GameTooltip:Show()
-        Shell:ShowSecureUseButton(self)
-    end)
-    button:SetScript("OnLeave", function()
-        if GameTooltip then
-            GameTooltip:Hide()
-        end
-    end)
-    button:SetScript("OnClick", function(self, mouseButton)
-        if self.dragging then
-            self.dragging = nil
-            return
-        end
-
-        if Shell:HandleItemModifiedClick(self.link) then
-            return
-        end
-
-        if mouseButton == "RightButton" then
-            Shell:ShowSecureUseButton(self)
-        elseif mouseButton == "LeftButton" then
-            Shell:PickupBagSlot(self.bag, self.slot)
-        end
-    end)
-    button:SetScript("OnDragStart", function(self)
-        self.dragging = true
-        Shell:PickupBagSlot(self.bag, self.slot)
-    end)
-    button:SetScript("OnReceiveDrag", function(self)
-        Shell:PickupBagSlot(self.bag, self.slot)
-    end)
 
     return button
 end
@@ -1530,6 +1386,16 @@ function Shell:CreateCharacterOverviewPanel()
     inventorySummary:SetText("")
     S.Theme:ApplyTextColor(inventorySummary, "textMuted")
 
+    local bagParents = {}
+    local firstBag, lastBag = self:GetBagRange()
+
+    for bag = firstBag, lastBag do
+        local bagFrame = CreateFrame("Frame", nil, inventory)
+        bagFrame:SetID(bag)
+        bagFrame:SetAllPoints(inventory)
+        bagParents[bag] = bagFrame
+    end
+
     local bagButtons = {}
 
     for index = 1, 120 do
@@ -1562,6 +1428,7 @@ function Shell:CreateCharacterOverviewPanel()
     self.characterOverview = {
         gear = gear,
         inventory = inventory,
+        bagParents = bagParents,
         leftRows = leftRows,
         rightRows = rightRows,
         weaponRows = weaponRows,
@@ -1714,6 +1581,8 @@ function Shell:UpdateCharacterOverviewBags()
                 button.bag = bag
                 button.slot = slot
                 button.link = link
+                button:SetParent(overview.bagParents[bag] or overview.inventory)
+                button:SetID(slot)
 
                 button:ClearAllPoints()
                 button:SetPoint("TOPLEFT", overview.inventory, "TOPLEFT", 10 + (column * 34), -30 - (row * 34))
