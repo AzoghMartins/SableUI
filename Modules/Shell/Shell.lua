@@ -84,6 +84,15 @@ function Shell:OnLoad()
     S:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function()
         Shell:RefreshCharacterOverviewIfShown()
     end)
+    S:RegisterEvent("PLAYER_TALENT_UPDATE", function()
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
+    S:RegisterEvent("CHARACTER_POINTS_CHANGED", function()
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
+    S:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED", function()
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
 end
 
 function Shell:Enable()
@@ -1384,45 +1393,126 @@ function Shell:CreateBagButton(parent)
     return button
 end
 
-function Shell:CreateTalentTreeCard(parent, index)
-    local card = CreateFrame("Frame", nil, parent)
-    card:SetHeight(96)
-    S.Theme:ApplyBackdrop(card, "panelAlt")
+function Shell:GetTalentLink(tab, talentIndex)
+    if GetTalentLink then
+        local ok, link = pcall(GetTalentLink, tab, talentIndex)
 
-    local icon = card:CreateTexture(nil, "ARTWORK")
-    icon:SetWidth(34)
-    icon:SetHeight(34)
-    icon:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -28)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        if ok and link then
+            return link
+        end
+    end
 
-    local name = S.Theme:CreateFontString(card, "bold", 12, "")
-    name:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, 2)
-    name:SetPoint("RIGHT", card, "RIGHT", -10, 0)
-    name:SetJustifyH("LEFT")
-    name:SetText("-")
+    return nil
+end
 
-    local points = S.Theme:CreateFontString(card, "normal", 11, "")
-    points:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -6)
-    points:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+function Shell:SetTalentTooltip(button)
+    if not button or not GameTooltip then
+        return
+    end
+
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+
+    local shown
+
+    if GameTooltip.SetTalent then
+        local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
+        local ok = pcall(function()
+            GameTooltip:SetTalent(button.tab, button.talentIndex, false, false, activeGroup)
+        end)
+
+        shown = ok
+    end
+
+    if not shown then
+        GameTooltip:SetText(button.talentName or "-")
+        GameTooltip:AddLine(button.rankText or "", 0.58, 0.57, 0.53)
+    end
+
+    GameTooltip:Show()
+end
+
+function Shell:LearnOverviewTalent(tab, talentIndex)
+    if not tab or not talentIndex or not LearnTalent then
+        return
+    end
+
+    LearnTalent(tab, talentIndex, false)
+    self:RefreshOverviewAfterItemAction()
+end
+
+function Shell:CreateTalentButton(parent)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetWidth(26)
+    button:SetHeight(26)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    S.Theme:ApplyBackdrop(button, "panelAlt")
+
+    button.icon = button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    button.icon:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+    button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button.rank = S.Theme:CreateFontString(button, "normal", 9, "OUTLINE")
+    button.rank:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 0)
+    button.rank:SetJustifyH("RIGHT")
+
+    button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+
+    button:SetScript("OnEnter", function(self)
+        Shell:SetTalentTooltip(self)
+    end)
+    button:SetScript("OnLeave", function()
+        if GameTooltip then
+            GameTooltip:Hide()
+        end
+    end)
+    button:SetScript("OnClick", function(self, mouseButton)
+        if IsModifiedClick and IsModifiedClick("CHATLINK") then
+            local link = Shell:GetTalentLink(self.tab, self.talentIndex)
+
+            if link and ChatEdit_InsertLink then
+                ChatEdit_InsertLink(link)
+            end
+
+            return
+        end
+
+        if mouseButton == "LeftButton" then
+            Shell:LearnOverviewTalent(self.tab, self.talentIndex)
+        end
+    end)
+
+    return button
+end
+
+function Shell:CreateTalentTreePanel(parent, index)
+    local tree = CreateFrame("Frame", nil, parent)
+    S.Theme:ApplyBackdrop(tree, "panelAlt")
+
+    local title = S.Theme:CreateFontString(tree, "bold", 11, "")
+    title:SetPoint("TOPLEFT", tree, "TOPLEFT", 8, -7)
+    title:SetPoint("RIGHT", tree, "RIGHT", -8, 0)
+    title:SetJustifyH("LEFT")
+    title:SetText("-")
+
+    local points = S.Theme:CreateFontString(tree, "normal", 10, "")
+    points:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+    points:SetPoint("RIGHT", tree, "RIGHT", -8, 0)
     points:SetJustifyH("LEFT")
-    points:SetText("0 points")
+    points:SetText("0")
     S.Theme:ApplyTextColor(points, "textMuted")
 
-    local status = S.Theme:CreateFontString(card, "normal", 11, "")
-    status:SetPoint("TOPLEFT", points, "BOTTOMLEFT", 0, -6)
-    status:SetPoint("RIGHT", card, "RIGHT", -10, 0)
-    status:SetJustifyH("LEFT")
-    status:SetText("-")
-    S.Theme:ApplyTextColor(status, "textMuted")
+    local grid = CreateFrame("Frame", nil, tree)
+    grid:SetPoint("TOPLEFT", tree, "TOPLEFT", 8, -38)
+    grid:SetPoint("BOTTOMRIGHT", tree, "BOTTOMRIGHT", -8, 8)
 
-    card.index = index
-    card.icon = icon
-    card.name = name
-    card.points = points
-    card.status = status
+    tree.index = index
+    tree.title = title
+    tree.points = points
+    tree.grid = grid
+    tree.buttons = {}
 
-    return card
+    return tree
 end
 
 function Shell:GetBagRange()
@@ -1537,10 +1627,10 @@ function Shell:CreateCharacterOverviewPanel()
     talentsTitle:SetPoint("TOPLEFT", talents, "TOPLEFT", 10, -8)
     talentsTitle:SetText("Talents")
 
-    local talentCards = {}
+    local talentTrees = {}
 
     for index = 1, 3 do
-        talentCards[index] = self:CreateTalentTreeCard(talents, index)
+        talentTrees[index] = self:CreateTalentTreePanel(talents, index)
     end
 
     local summary = self:CreateStatGroup(panel, "Summary", 6, 150, 182)
@@ -1575,7 +1665,7 @@ function Shell:CreateCharacterOverviewPanel()
         modelPanel = modelPanel,
         model = model,
         bagButtons = bagButtons,
-        talentCards = talentCards,
+        talentTrees = talentTrees,
         inventorySummary = inventorySummary,
         summary = summary,
         attributes = attributes,
@@ -1650,16 +1740,17 @@ function Shell:LayoutCharacterOverviewPanel()
     overview.talents:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
     overview.talents:Show()
 
-    for index = 1, table.getn(overview.talentCards) do
-        local card = overview.talentCards[index]
-        card:ClearAllPoints()
-        card:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
-        card:SetPoint("RIGHT", overview.talents, "RIGHT", -10, 0)
+    for index = 1, table.getn(overview.talentTrees) do
+        local tree = overview.talentTrees[index]
+        tree:ClearAllPoints()
+        tree:SetPoint("TOP", overview.talents, "TOP", 0, -30)
+        tree:SetPoint("BOTTOM", overview.talents, "BOTTOM", 0, 8)
+        tree:SetWidth(math.floor((talentsWidth - 36) / 3))
 
         if index == 1 then
-            card:SetPoint("TOP", overview.talents, "TOP", 0, -30)
+            tree:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
         else
-            card:SetPoint("TOP", overview.talentCards[index - 1], "BOTTOM", 0, -8)
+            tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
         end
     end
 
@@ -1768,48 +1859,91 @@ end
 function Shell:UpdateCharacterOverviewTalents()
     local overview = self.characterOverview
 
-    if not overview or not overview.talentCards then
+    if not overview or not overview.talentTrees then
         return
     end
 
     local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
-    local maxPoints = -1
-    local primaryIndex
+    local unspent = GetUnspentTalentPoints and GetUnspentTalentPoints(nil, false, activeGroup) or nil
 
-    for index = 1, table.getn(overview.talentCards) do
+    for tab = 1, table.getn(overview.talentTrees) do
+        local tree = overview.talentTrees[tab]
         local name
-        local icon
         local points
 
         if GetTalentTabInfo then
-            name, icon, points = GetTalentTabInfo(index, false, false, activeGroup)
+            name, _, points = GetTalentTabInfo(tab, false, false, activeGroup)
         end
 
-        points = tonumber(points) or 0
+        tree.title:SetText(name or ("Tree " .. tostring(tab)))
 
-        if points > maxPoints then
-            maxPoints = points
-            primaryIndex = index
-        end
-
-        local card = overview.talentCards[index]
-        card.name:SetText(name or ("Tree " .. tostring(index)))
-        card.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-        card.points:SetText(tostring(points) .. " points")
-        card.status:SetText("-")
-        S.Theme:ApplyTextColor(card.status, "textMuted")
-    end
-
-    for index = 1, table.getn(overview.talentCards) do
-        local card = overview.talentCards[index]
-
-        if primaryIndex == index and maxPoints > 0 then
-            card.status:SetText("Primary")
-            S.Theme:ApplyTextColor(card.status, "accent")
-        elseif activeGroup and activeGroup > 1 then
-            card.status:SetText("Spec " .. tostring(activeGroup))
+        if unspent then
+            tree.points:SetText(tostring(points or 0) .. " spent, " .. tostring(unspent) .. " free")
         else
-            card.status:SetText("Available")
+            tree.points:SetText(tostring(points or 0) .. " spent")
+        end
+
+        local numTalents = GetNumTalents and GetNumTalents(tab, false, false) or 0
+        local gridWidth = tree.grid:GetWidth() or 120
+        local gridHeight = tree.grid:GetHeight() or 260
+        local buttonSize = math.floor(math.min((gridWidth - 18) / 4, (gridHeight - 30) / 11))
+
+        buttonSize = Clamp(buttonSize, 18, 28)
+
+        local xStep = math.floor((gridWidth - buttonSize) / 3)
+        local yStep = math.floor((gridHeight - buttonSize) / 10)
+
+        for index = 1, numTalents do
+            local button = tree.buttons[index]
+
+            if not button then
+                button = self:CreateTalentButton(tree.grid)
+                tree.buttons[index] = button
+            end
+
+            local talentName, icon, row, column, currentRank, maxRank, _, meetsPrereq, previewRank = GetTalentInfo(tab, index, false, false, activeGroup)
+            local displayRank = tonumber(previewRank) or tonumber(currentRank) or 0
+
+            row = tonumber(row) or 1
+            column = tonumber(column) or 1
+            maxRank = tonumber(maxRank) or 0
+
+            button:SetWidth(buttonSize)
+            button:SetHeight(buttonSize)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", tree.grid, "TOPLEFT", (column - 1) * xStep, -((row - 1) * yStep))
+            button.tab = tab
+            button.talentIndex = index
+            button.talentName = talentName
+            button.rankText = tostring(displayRank) .. "/" .. tostring(maxRank)
+            button.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            button.rank:SetText(button.rankText)
+
+            if displayRank and displayRank > 0 then
+                button:SetAlpha(1)
+                if button.icon.SetDesaturated then
+                    button.icon:SetDesaturated(false)
+                end
+                button.rank:SetTextColor(0.1, 1, 0.1)
+            elseif meetsPrereq == false or (unspent and unspent <= 0) then
+                button:SetAlpha(0.42)
+                if button.icon.SetDesaturated then
+                    button.icon:SetDesaturated(true)
+                end
+                button.rank:SetTextColor(0.7, 0.7, 0.7)
+            else
+                button:SetAlpha(0.75)
+                if button.icon.SetDesaturated then
+                    button.icon:SetDesaturated(false)
+                end
+                button.rank:SetTextColor(1, 0.82, 0)
+            end
+
+            button:Show()
+        end
+
+        for index = numTalents + 1, table.getn(tree.buttons) do
+            tree.buttons[index]:Hide()
         end
     end
 end
