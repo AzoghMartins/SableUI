@@ -972,6 +972,8 @@ function Shell:CreatePaperDollSlotButton(parent, slotInfo)
         end)
     end
 
+    local isPaperDollButton = ok and button
+
     if not ok or not button then
         name = "SableUICustomEquipmentSlot" .. tostring(self.equipmentButtonIndex)
         button = CreateFrame("Button", name, parent)
@@ -1017,17 +1019,34 @@ function Shell:CreatePaperDollSlotButton(parent, slotInfo)
     button.slotID = self:GetInventorySlotID(slotInfo.slot)
 
     S.Theme:ApplyBackdrop(button, "panelAlt")
-    if button.SetNormalTexture then
-        button:SetNormalTexture(nil)
-    end
-    if button.SetPushedTexture then
-        button:SetPushedTexture(nil)
-    end
-    if button.SetHighlightTexture then
-        button:SetHighlightTexture(nil)
-    end
-    if button.SetCheckedTexture then
-        button:SetCheckedTexture(nil)
+    if isPaperDollButton then
+        local normal = _G[name .. "NormalTexture"] or button:CreateTexture(name .. "NormalTexture", "BACKGROUND")
+
+        normal:SetAllPoints(button)
+        if not normal:GetTexture() then
+            normal:SetTexture("Interface\\Buttons\\UI-Quickslot2")
+        end
+        normal:SetAlpha(0)
+        button:SetNormalTexture(normal)
+
+        button.ignoreTexture = button.ignoreTexture or _G[name .. "IgnoreTexture"]
+        if button.ignoreTexture then
+            button.ignoreTexture:SetAlpha(0)
+            button.ignoreTexture:Hide()
+        end
+    else
+        if button.SetNormalTexture then
+            button:SetNormalTexture(nil)
+        end
+        if button.SetPushedTexture then
+            button:SetPushedTexture(nil)
+        end
+        if button.SetHighlightTexture then
+            button:SetHighlightTexture(nil)
+        end
+        if button.SetCheckedTexture then
+            button:SetCheckedTexture(nil)
+        end
     end
 
     button.texture = _G[name .. "IconTexture"] or button:CreateTexture(nil, "ARTWORK")
@@ -1188,6 +1207,11 @@ function Shell:UpdateEquipmentRow(row)
     row.icon.texture:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
     row.item:SetText(itemName or "Empty")
     self:SetQualityColor(row.item, quality)
+
+    if row.icon.ignoreTexture then
+        row.icon.ignoreTexture:SetAlpha(0)
+        row.icon.ignoreTexture:Hide()
+    end
 
     if link then
         row.icon:SetAlpha(1)
