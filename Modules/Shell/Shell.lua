@@ -1552,28 +1552,14 @@ function Shell:LayoutTalentBackground(tree, width, height)
         return
     end
 
-    width = width or tree.background:GetWidth() or 0
-    height = height or tree.background:GetHeight() or 0
-
-    if width <= 0 or height <= 0 then
-        return
-    end
-
-    local topHeight = math.floor(height * (256 / 384))
-    local bottomHeight = height - topHeight
     local textures = tree.backgroundTextures
 
     textures.topLeft:ClearAllPoints()
     textures.topLeft:SetPoint("TOPLEFT", tree.background, "TOPLEFT", 0, 0)
-    textures.topLeft:SetWidth(width)
-    textures.topLeft:SetHeight(topHeight)
-
-    textures.bottomLeft:ClearAllPoints()
-    textures.bottomLeft:SetPoint("TOPLEFT", textures.topLeft, "BOTTOMLEFT", 0, 0)
-    textures.bottomLeft:SetWidth(width)
-    textures.bottomLeft:SetHeight(bottomHeight)
-
+    textures.topLeft:SetPoint("BOTTOMRIGHT", tree.background, "BOTTOMRIGHT", 0, 0)
+    textures.topLeft:Show()
     textures.topRight:Hide()
+    textures.bottomLeft:Hide()
     textures.bottomRight:Hide()
 end
 
