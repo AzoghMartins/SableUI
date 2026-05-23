@@ -1384,6 +1384,47 @@ function Shell:CreateBagButton(parent)
     return button
 end
 
+function Shell:CreateTalentTreeCard(parent, index)
+    local card = CreateFrame("Frame", nil, parent)
+    card:SetHeight(96)
+    S.Theme:ApplyBackdrop(card, "panelAlt")
+
+    local icon = card:CreateTexture(nil, "ARTWORK")
+    icon:SetWidth(34)
+    icon:SetHeight(34)
+    icon:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -28)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+
+    local name = S.Theme:CreateFontString(card, "bold", 12, "")
+    name:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, 2)
+    name:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+    name:SetJustifyH("LEFT")
+    name:SetText("-")
+
+    local points = S.Theme:CreateFontString(card, "normal", 11, "")
+    points:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -6)
+    points:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+    points:SetJustifyH("LEFT")
+    points:SetText("0 points")
+    S.Theme:ApplyTextColor(points, "textMuted")
+
+    local status = S.Theme:CreateFontString(card, "normal", 11, "")
+    status:SetPoint("TOPLEFT", points, "BOTTOMLEFT", 0, -6)
+    status:SetPoint("RIGHT", card, "RIGHT", -10, 0)
+    status:SetJustifyH("LEFT")
+    status:SetText("-")
+    S.Theme:ApplyTextColor(status, "textMuted")
+
+    card.index = index
+    card.icon = icon
+    card.name = name
+    card.points = points
+    card.status = status
+
+    return card
+end
+
 function Shell:GetBagRange()
     local lastBag = NUM_BAG_SLOTS or 4
     return 0, lastBag
@@ -1486,6 +1527,22 @@ function Shell:CreateCharacterOverviewPanel()
         button:Hide()
     end
 
+    local talents = CreateFrame("Frame", nil, panel)
+    talents:SetPoint("TOPLEFT", inventory, "TOPRIGHT", 12, 0)
+    talents:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
+    talents:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 196)
+    S.Theme:ApplyBackdrop(talents, "panel")
+
+    local talentsTitle = S.Theme:CreateFontString(talents, "bold", 12, "")
+    talentsTitle:SetPoint("TOPLEFT", talents, "TOPLEFT", 10, -8)
+    talentsTitle:SetText("Talents")
+
+    local talentCards = {}
+
+    for index = 1, 3 do
+        talentCards[index] = self:CreateTalentTreeCard(talents, index)
+    end
+
     local summary = self:CreateStatGroup(panel, "Summary", 6, 150, 182)
     summary:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, 0)
 
@@ -1510,6 +1567,7 @@ function Shell:CreateCharacterOverviewPanel()
     self.characterOverview = {
         gear = gear,
         inventory = inventory,
+        talents = talents,
         bagParents = bagParents,
         leftRows = leftRows,
         rightRows = rightRows,
@@ -1517,6 +1575,7 @@ function Shell:CreateCharacterOverviewPanel()
         modelPanel = modelPanel,
         model = model,
         bagButtons = bagButtons,
+        talentCards = talentCards,
         inventorySummary = inventorySummary,
         summary = summary,
         attributes = attributes,
@@ -1564,9 +1623,14 @@ function Shell:LayoutCharacterOverviewPanel()
 
     local panelWidth = self.characterOverviewPanel:GetWidth() or 1180
     local topBottomOffset = 206
-    local gearWidth = math.floor((panelWidth - 12) * 0.5)
+    local cardGap = 8
+    local cardWidth = math.floor((panelWidth - (cardGap * 6)) / 7)
 
-    gearWidth = Clamp(gearWidth, 520, 760)
+    cardWidth = math.max(128, cardWidth)
+
+    local gearWidth = (cardWidth * 3) + (cardGap * 2)
+    local inventoryWidth = cardWidth
+    local talentsWidth = (cardWidth * 3) + (cardGap * 2)
 
     overview.gear:SetWidth(gearWidth)
     overview.gear:ClearAllPoints()
@@ -1575,10 +1639,29 @@ function Shell:LayoutCharacterOverviewPanel()
     overview.gear:Show()
 
     overview.inventory:ClearAllPoints()
-    overview.inventory:SetPoint("TOPLEFT", overview.gear, "TOPRIGHT", 12, 0)
-    overview.inventory:SetPoint("TOPRIGHT", self.characterOverviewPanel, "TOPRIGHT", 0, 0)
-    overview.inventory:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
+    overview.inventory:SetWidth(inventoryWidth)
+    overview.inventory:SetPoint("TOPLEFT", overview.gear, "TOPRIGHT", cardGap, 0)
+    overview.inventory:SetPoint("BOTTOMLEFT", self.characterOverviewPanel, "BOTTOMLEFT", gearWidth + cardGap, topBottomOffset)
     overview.inventory:Show()
+
+    overview.talents:SetWidth(talentsWidth)
+    overview.talents:ClearAllPoints()
+    overview.talents:SetPoint("TOPLEFT", overview.inventory, "TOPRIGHT", cardGap, 0)
+    overview.talents:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
+    overview.talents:Show()
+
+    for index = 1, table.getn(overview.talentCards) do
+        local card = overview.talentCards[index]
+        card:ClearAllPoints()
+        card:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
+        card:SetPoint("RIGHT", overview.talents, "RIGHT", -10, 0)
+
+        if index == 1 then
+            card:SetPoint("TOP", overview.talents, "TOP", 0, -30)
+        else
+            card:SetPoint("TOP", overview.talentCards[index - 1], "BOTTOM", 0, -8)
+        end
+    end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
     local modelWidth = math.max(180, gearWidth - (rowWidth * 2) - 44)
@@ -1603,11 +1686,6 @@ function Shell:LayoutCharacterOverviewPanel()
             row:SetPoint("LEFT", overview.weaponRows[index - 1], "RIGHT", 8, 0)
         end
     end
-
-    local cardGap = 8
-    local cardWidth = math.floor((panelWidth - (cardGap * 6)) / 7)
-
-    cardWidth = math.max(128, cardWidth)
 
     for index = 1, table.getn(overview.statGroups) do
         local group = overview.statGroups[index]
@@ -1687,6 +1765,55 @@ function Shell:UpdateCharacterOverviewBags()
     overview.inventorySummary:SetText(tostring(freeSlots) .. " free / " .. tostring(totalSlots))
 end
 
+function Shell:UpdateCharacterOverviewTalents()
+    local overview = self.characterOverview
+
+    if not overview or not overview.talentCards then
+        return
+    end
+
+    local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
+    local maxPoints = -1
+    local primaryIndex
+
+    for index = 1, table.getn(overview.talentCards) do
+        local name
+        local icon
+        local points
+
+        if GetTalentTabInfo then
+            name, icon, points = GetTalentTabInfo(index, false, false, activeGroup)
+        end
+
+        points = tonumber(points) or 0
+
+        if points > maxPoints then
+            maxPoints = points
+            primaryIndex = index
+        end
+
+        local card = overview.talentCards[index]
+        card.name:SetText(name or ("Tree " .. tostring(index)))
+        card.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        card.points:SetText(tostring(points) .. " points")
+        card.status:SetText("-")
+        S.Theme:ApplyTextColor(card.status, "textMuted")
+    end
+
+    for index = 1, table.getn(overview.talentCards) do
+        local card = overview.talentCards[index]
+
+        if primaryIndex == index and maxPoints > 0 then
+            card.status:SetText("Primary")
+            S.Theme:ApplyTextColor(card.status, "accent")
+        elseif activeGroup and activeGroup > 1 then
+            card.status:SetText("Spec " .. tostring(activeGroup))
+        else
+            card.status:SetText("Available")
+        end
+    end
+end
+
 function Shell:UpdateOverviewEquipmentRows(rows, totals)
     for index = 1, table.getn(rows) do
         local item = self:UpdateEquipmentRow(rows[index])
@@ -1725,6 +1852,7 @@ function Shell:UpdateCharacterOverviewPanel()
     end
 
     self:UpdateCharacterOverviewBags()
+    self:UpdateCharacterOverviewTalents()
 
     local name = S.Utils.GetUnitName("player") or "-"
     local level = UnitLevel and UnitLevel("player") or nil
