@@ -1681,15 +1681,19 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
 
     local fromConnectorX = fromX + centerOffset
     local toConnectorX = toX + centerOffset
-    local startY = fromY + buttonSize - 4
-    local cornerY = toY + yStep - 4
-    local verticalHeight = math.max(connectorSize, math.abs(startY - cornerY))
+    local routeY = fromY + math.floor((buttonSize - connectorSize) / 2)
     local horizontalX = math.min(fromConnectorX, toConnectorX)
     local horizontalWidth = math.max(connectorSize, math.abs(toConnectorX - fromConnectorX) + connectorSize)
 
-    self:DrawTalentConnectorSegment(tree, "branch", "top", fromConnectorX, startY, connectorSize, verticalHeight, isActive)
-    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", fromConnectorX, cornerY, connectorSize, connectorSize, isActive)
-    self:DrawTalentConnectorSegment(tree, "branch", "left", horizontalX, cornerY + centerOffset, horizontalWidth, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "branch", "left", horizontalX, routeY, horizontalWidth, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", toConnectorX, routeY, connectorSize, connectorSize, isActive)
+
+    for row = fromTalent.row + 1, toTalent.row - 1 do
+        local _, y = self:GetTalentGridPoint(row, toTalent.column, buttonSize, xStep, yStep)
+        self:DrawTalentConnectorSegment(tree, "branch", "top", toConnectorX, y + 4, connectorSize, math.max(connectorSize, yStep), isActive)
+    end
+
+    self:DrawTalentConnectorSegment(tree, "branch", "top", toConnectorX, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
     self:DrawTalentConnectorSegment(tree, "arrow", "top", toConnectorX, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
 end
 
