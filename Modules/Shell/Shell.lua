@@ -1551,6 +1551,26 @@ function Shell:CreateTalentTreePanel(parent, index)
     return tree
 end
 
+function Shell:CreateTalentTreeTab(parent, index)
+    local tab = CreateFrame("Button", nil, parent)
+    tab:SetHeight(22)
+    S.Theme:ApplyBackdrop(tab, "panelAlt")
+
+    local text = S.Theme:CreateFontString(tab, "normal", 10, "")
+    text:SetPoint("CENTER", tab, "CENTER", 0, 0)
+    text:SetJustifyH("CENTER")
+    text:SetText("-")
+    tab.text = text
+    tab.index = index
+
+    tab:SetScript("OnClick", function(self)
+        Shell.overviewTalentTab = self.index
+        Shell:RefreshCharacterOverviewIfShown()
+    end)
+
+    return tab
+end
+
 Shell.talentConnectorCoords = {
     branch = {
         top = { left = 0.12890625, width = 0.125, bottom = 0.96875 },
@@ -1777,6 +1797,12 @@ function Shell:CreateCharacterOverviewPanel()
     talentsTitle:SetPoint("TOPLEFT", talents, "TOPLEFT", 10, -8)
     talentsTitle:SetText("Talents")
 
+    local talentTabs = {}
+
+    for index = 1, 3 do
+        talentTabs[index] = self:CreateTalentTreeTab(talents, index)
+    end
+
     local talentTrees = {}
 
     for index = 1, 3 do
@@ -1815,6 +1841,7 @@ function Shell:CreateCharacterOverviewPanel()
         modelPanel = modelPanel,
         model = model,
         bagButtons = bagButtons,
+        talentTabs = talentTabs,
         talentTrees = talentTrees,
         inventorySummary = inventorySummary,
         summary = summary,
@@ -1890,18 +1917,24 @@ function Shell:LayoutCharacterOverviewPanel()
     overview.talents:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
     overview.talents:Show()
 
+    for index = 1, table.getn(overview.talentTabs) do
+        local tab = overview.talentTabs[index]
+        tab:ClearAllPoints()
+        tab:SetWidth(math.floor((talentsWidth - 36) / 3))
+
+        if index == 1 then
+            tab:SetPoint("TOPLEFT", overview.talents, "TOPLEFT", 10, -28)
+        else
+            tab:SetPoint("LEFT", overview.talentTabs[index - 1], "RIGHT", 8, 0)
+        end
+    end
+
     for index = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[index]
         tree:ClearAllPoints()
-        tree:SetPoint("TOP", overview.talents, "TOP", 0, -30)
+        tree:SetPoint("TOPLEFT", overview.talents, "TOPLEFT", 10, -58)
+        tree:SetPoint("RIGHT", overview.talents, "RIGHT", -10, 0)
         tree:SetPoint("BOTTOM", overview.talents, "BOTTOM", 0, 8)
-        tree:SetWidth(math.floor((talentsWidth - 36) / 3))
-
-        if index == 1 then
-            tree:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
-        else
-            tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
-        end
     end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
@@ -2015,6 +2048,43 @@ function Shell:UpdateCharacterOverviewTalents()
 
     local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
     local unspent = GetUnspentTalentPoints and GetUnspentTalentPoints(nil, false, activeGroup) or nil
+    local selectedTab = self.overviewTalentTab
+    local selectedPoints = -1
+
+    for tab = 1, table.getn(overview.talentTrees) do
+        local name
+        local points
+
+        if GetTalentTabInfo then
+            name, _, points = GetTalentTabInfo(tab, false, false, activeGroup)
+        end
+
+        points = tonumber(points) or 0
+
+        if overview.talentTabs and overview.talentTabs[tab] then
+            overview.talentTabs[tab].text:SetText((name or ("Tree " .. tostring(tab))) .. " (" .. tostring(points) .. ")")
+        end
+
+        if not selectedTab and points > selectedPoints then
+            selectedPoints = points
+            selectedTab = tab
+        end
+    end
+
+    selectedTab = selectedTab or 1
+    self.overviewTalentTab = selectedTab
+
+    for tab = 1, table.getn(overview.talentTabs or {}) do
+        local tabButton = overview.talentTabs[tab]
+
+        if tab == selectedTab then
+            tabButton:SetBackdropBorderColor(S.Theme:GetColor("accent"))
+            tabButton.text:SetTextColor(S.Theme:GetColor("accent"))
+        else
+            tabButton:SetBackdropBorderColor(S.Theme:GetColor("border"))
+            S.Theme:ApplyTextColor(tabButton.text, "textMuted")
+        end
+    end
 
     for tab = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[tab]
@@ -2043,12 +2113,23 @@ function Shell:UpdateCharacterOverviewTalents()
             tree.points:SetText(tostring(points or 0) .. " spent")
         end
 
+        if tab ~= selectedTab then
+            tree:Hide()
+            self:HideUnusedTalentConnectors(tree)
+            for index = 1, table.getn(tree.buttons) do
+                tree.buttons[index]:Hide()
+            end
+        else
+            tree:Show()
+        end
+
+        if tab == selectedTab then
         local numTalents = GetNumTalents and GetNumTalents(tab, false, false) or 0
         local gridWidth = tree.grid:GetWidth() or 120
         local gridHeight = tree.grid:GetHeight() or 260
         local buttonSize = math.floor(math.min((gridWidth - 18) / 4, (gridHeight - 30) / 11))
 
-        buttonSize = Clamp(buttonSize, 18, 28)
+        buttonSize = Clamp(buttonSize, 24, 37)
 
         local xStep = math.floor((gridWidth - buttonSize) / 3)
         local yStep = math.floor((gridHeight - buttonSize) / 10)
@@ -2132,6 +2213,7 @@ function Shell:UpdateCharacterOverviewTalents()
 
         for index = numTalents + 1, table.getn(tree.buttons) do
             tree.buttons[index]:Hide()
+        end
         end
     end
 end
