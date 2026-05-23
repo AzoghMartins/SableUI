@@ -1017,10 +1017,18 @@ function Shell:CreatePaperDollSlotButton(parent, slotInfo)
     button.slotID = self:GetInventorySlotID(slotInfo.slot)
 
     S.Theme:ApplyBackdrop(button, "panelAlt")
-    button:SetNormalTexture(nil)
-    button:SetPushedTexture(nil)
-    button:SetHighlightTexture(nil)
-    button:SetCheckedTexture(nil)
+    if button.SetNormalTexture then
+        button:SetNormalTexture(nil)
+    end
+    if button.SetPushedTexture then
+        button:SetPushedTexture(nil)
+    end
+    if button.SetHighlightTexture then
+        button:SetHighlightTexture(nil)
+    end
+    if button.SetCheckedTexture then
+        button:SetCheckedTexture(nil)
+    end
 
     button.texture = _G[name .. "IconTexture"] or button:CreateTexture(nil, "ARTWORK")
     button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
