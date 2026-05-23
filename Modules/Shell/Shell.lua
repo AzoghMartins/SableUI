@@ -1679,9 +1679,18 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
         return
     end
 
-    self:DrawTalentConnectorSegment(tree, "branch", "top", fromX + centerOffset, fromY + buttonSize - 4, connectorSize, math.max(connectorSize, yStep), isActive)
-    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", toX + centerOffset, fromY + yStep - 4, connectorSize, connectorSize, isActive)
-    self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
+    local fromConnectorX = fromX + centerOffset
+    local toConnectorX = toX + centerOffset
+    local startY = fromY + buttonSize - 4
+    local cornerY = toY + yStep - 4
+    local verticalHeight = math.max(connectorSize, math.abs(startY - cornerY))
+    local horizontalX = math.min(fromConnectorX, toConnectorX)
+    local horizontalWidth = math.max(connectorSize, math.abs(toConnectorX - fromConnectorX) + connectorSize)
+
+    self:DrawTalentConnectorSegment(tree, "branch", "top", fromConnectorX, startY, connectorSize, verticalHeight, isActive)
+    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", fromConnectorX, cornerY, connectorSize, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "branch", "left", horizontalX, cornerY + centerOffset, horizontalWidth, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "arrow", "top", toConnectorX, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
 end
 
 function Shell:GetBagRange()
