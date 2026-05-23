@@ -1646,19 +1646,26 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
         return
     end
 
-    local fromX, fromY = self:GetTalentGridPoint(fromTalent.row, fromTalent.column, buttonSize, xStep, yStep)
-    local toX, toY = self:GetTalentGridPoint(toTalent.row, toTalent.column, buttonSize, xStep, yStep)
     local connectorSize = Clamp(buttonSize, 18, 26)
-    local centerOffset = math.floor((buttonSize - connectorSize) / 2)
+    local scale = connectorSize / 32
+    local function SOffset(value)
+        return math.floor(value * scale)
+    end
+    local function Offset(row, column)
+        return self:GetTalentGridPoint(row, column, buttonSize, xStep, yStep)
+    end
     local isActive = fromTalent.rank and fromTalent.maxRank and fromTalent.rank >= fromTalent.maxRank
 
     if fromTalent.column == toTalent.column then
         for row = fromTalent.row + 1, toTalent.row - 1 do
-            local x, y = self:GetTalentGridPoint(row, fromTalent.column, buttonSize, xStep, yStep)
-            self:DrawTalentConnectorSegment(tree, "branch", "top", x + centerOffset, y + 4, connectorSize, math.max(connectorSize, yStep), isActive)
+            local x, y = Offset(row, fromTalent.column)
+            self:DrawTalentConnectorSegment(tree, "branch", "top", x + SOffset(2), y + connectorSize, connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "branch", "top", x + SOffset(2), y, connectorSize, connectorSize, isActive)
         end
 
-        self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
+        local x, y = Offset(toTalent.row, toTalent.column)
+        self:DrawTalentConnectorSegment(tree, "branch", "top", x + SOffset(2), y + connectorSize, connectorSize, connectorSize, isActive)
+        self:DrawTalentConnectorSegment(tree, "arrow", "top", x + SOffset(2), y + SOffset(16), connectorSize, connectorSize, isActive)
         return
     end
 
@@ -1667,34 +1674,57 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
         local rightColumn = math.max(fromTalent.column, toTalent.column)
 
         for column = leftColumn + 1, rightColumn - 1 do
-            local x, y = self:GetTalentGridPoint(fromTalent.row, column, buttonSize, xStep, yStep)
-            self:DrawTalentConnectorSegment(tree, "branch", "left", x - 4, y + centerOffset, math.max(connectorSize, xStep), connectorSize, isActive)
+            local x, y = Offset(fromTalent.row, column)
+            self:DrawTalentConnectorSegment(tree, "branch", "left", x - connectorSize, y - SOffset(2), connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "branch", "left", x, y - SOffset(2), connectorSize, connectorSize, isActive)
         end
 
+        local x, y = Offset(toTalent.row, toTalent.column)
         if fromTalent.column < toTalent.column then
-            self:DrawTalentConnectorSegment(tree, "arrow", "right", toX - connectorSize, toY + centerOffset, connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "branch", "left", x + connectorSize, y - SOffset(2), connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "arrow", "right", x + SOffset(20), y - SOffset(2), connectorSize, connectorSize, isActive)
         else
-            self:DrawTalentConnectorSegment(tree, "arrow", "left", toX + buttonSize - 4, toY + centerOffset, connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "branch", "left", x - connectorSize, y - SOffset(2), connectorSize, connectorSize, isActive)
+            self:DrawTalentConnectorSegment(tree, "arrow", "left", x - SOffset(15), y - SOffset(2), connectorSize, connectorSize, isActive)
         end
         return
     end
 
-    local fromConnectorX = fromX + centerOffset
-    local toConnectorX = toX + centerOffset
-    local routeY = fromY + math.floor((buttonSize - connectorSize) / 2)
-    local horizontalX = math.min(fromConnectorX, toConnectorX)
-    local horizontalWidth = math.max(connectorSize, math.abs(toConnectorX - fromConnectorX) + connectorSize)
+    local minColumn
+    local maxColumn
 
-    self:DrawTalentConnectorSegment(tree, "branch", "left", horizontalX, routeY, horizontalWidth, connectorSize, isActive)
-    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", toConnectorX, routeY, connectorSize, connectorSize, isActive)
-
-    for row = fromTalent.row + 1, toTalent.row - 1 do
-        local _, y = self:GetTalentGridPoint(row, toTalent.column, buttonSize, xStep, yStep)
-        self:DrawTalentConnectorSegment(tree, "branch", "top", toConnectorX, y + 4, connectorSize, math.max(connectorSize, yStep), isActive)
+    if toTalent.column < fromTalent.column then
+        minColumn = toTalent.column + 1
+        maxColumn = fromTalent.column - 1
+    else
+        minColumn = fromTalent.column + 1
+        maxColumn = toTalent.column - 1
     end
 
-    self:DrawTalentConnectorSegment(tree, "branch", "top", toConnectorX, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
-    self:DrawTalentConnectorSegment(tree, "arrow", "top", toConnectorX, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
+    for column = minColumn, maxColumn do
+        local x, y = Offset(fromTalent.row, column)
+        self:DrawTalentConnectorSegment(tree, "branch", "left", x - connectorSize, y - SOffset(2), connectorSize, connectorSize, isActive)
+        self:DrawTalentConnectorSegment(tree, "branch", "left", x, y - SOffset(2), connectorSize, connectorSize, isActive)
+    end
+
+    local x, y = Offset(fromTalent.row, toTalent.column)
+    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", x + SOffset(2), y - SOffset(2), connectorSize, connectorSize, isActive)
+
+    if toTalent.column < fromTalent.column then
+        self:DrawTalentConnectorSegment(tree, "branch", "left", x + SOffset(35), y - SOffset(2), connectorSize, connectorSize, isActive)
+    else
+        self:DrawTalentConnectorSegment(tree, "branch", "left", x - SOffset(29), y - SOffset(2), connectorSize, connectorSize, isActive)
+    end
+
+    for row = fromTalent.row + 1, toTalent.row - 1 do
+        local xOffset, yOffset = Offset(row, toTalent.column)
+        self:DrawTalentConnectorSegment(tree, "branch", "top", xOffset + SOffset(2), yOffset + connectorSize, connectorSize, connectorSize, isActive)
+        self:DrawTalentConnectorSegment(tree, "branch", "top", xOffset + SOffset(2), yOffset, connectorSize, connectorSize, isActive)
+    end
+
+    x, y = Offset(toTalent.row, toTalent.column)
+    self:DrawTalentConnectorSegment(tree, "branch", "top", x + SOffset(2), y + connectorSize, connectorSize, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "arrow", "top", x + SOffset(2), y + SOffset(16), connectorSize, connectorSize, isActive)
 end
 
 function Shell:GetBagRange()
