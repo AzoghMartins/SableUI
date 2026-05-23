@@ -1708,11 +1708,11 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
     end
 
     local x, y = Offset(fromTalent.row, toTalent.column)
-    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", x + SOffset(2), y - SOffset(2), connectorSize, connectorSize, isActive)
-
     if toTalent.column < fromTalent.column then
+        self:DrawTalentConnectorSegment(tree, "branch", "topleft", x + SOffset(2), y - SOffset(2), connectorSize, connectorSize, isActive)
         self:DrawTalentConnectorSegment(tree, "branch", "left", x + SOffset(35), y - SOffset(2), connectorSize, connectorSize, isActive)
     else
+        self:DrawTalentConnectorSegment(tree, "branch", "topright", x + SOffset(2), y - SOffset(2), connectorSize, connectorSize, isActive)
         self:DrawTalentConnectorSegment(tree, "branch", "left", x - SOffset(29), y - SOffset(2), connectorSize, connectorSize, isActive)
     end
 
