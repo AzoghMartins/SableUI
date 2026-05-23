@@ -924,6 +924,21 @@ function Shell:PickupInventorySlot(slotID)
     return true
 end
 
+function Shell:IsInventorySlotTargeting()
+    return (SpellIsTargeting and SpellIsTargeting())
+        or (CursorHasSpell and CursorHasSpell())
+end
+
+function Shell:UseInventorySlot(slotID)
+    if not slotID or not UseInventoryItem then
+        return false
+    end
+
+    UseInventoryItem(slotID)
+    self:RefreshOverviewAfterItemAction()
+    return true
+end
+
 function Shell:PickupBagSlot(bag, slot)
     if bag == nil or not slot or not PickupContainerItem then
         return false
@@ -998,7 +1013,14 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
         end
 
         if button == "LeftButton" then
+            if Shell:IsInventorySlotTargeting() then
+                Shell:UseInventorySlot(self.slotID)
+                return
+            end
+
             Shell:PickupInventorySlot(self.slotID)
+        elseif button == "RightButton" then
+            Shell:UseInventorySlot(self.slotID)
         end
     end)
     icon:SetScript("OnDragStart", function(self)
