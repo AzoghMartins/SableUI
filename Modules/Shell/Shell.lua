@@ -1547,32 +1547,34 @@ function Shell:CreateTalentTreePanel(parent, index)
     return tree
 end
 
-function Shell:LayoutTalentBackground(tree)
+function Shell:LayoutTalentBackground(tree, width, height)
     if not tree or not tree.background or not tree.backgroundTextures then
         return
     end
 
-    local width = tree.background:GetWidth() or 0
-    local height = tree.background:GetHeight() or 0
+    width = width or tree.background:GetWidth() or 0
+    height = height or tree.background:GetHeight() or 0
 
     if width <= 0 or height <= 0 then
         return
     end
 
-    local leftWidth = math.floor(width * (256 / 320))
-    local rightWidth = width - leftWidth
     local topHeight = math.floor(height * (256 / 384))
     local bottomHeight = height - topHeight
     local textures = tree.backgroundTextures
 
-    textures.topLeft:SetWidth(leftWidth)
+    textures.topLeft:ClearAllPoints()
+    textures.topLeft:SetPoint("TOPLEFT", tree.background, "TOPLEFT", 0, 0)
+    textures.topLeft:SetWidth(width)
     textures.topLeft:SetHeight(topHeight)
-    textures.topRight:SetWidth(rightWidth)
-    textures.topRight:SetHeight(topHeight)
-    textures.bottomLeft:SetWidth(leftWidth)
+
+    textures.bottomLeft:ClearAllPoints()
+    textures.bottomLeft:SetPoint("TOPLEFT", textures.topLeft, "BOTTOMLEFT", 0, 0)
+    textures.bottomLeft:SetWidth(width)
     textures.bottomLeft:SetHeight(bottomHeight)
-    textures.bottomRight:SetWidth(rightWidth)
-    textures.bottomRight:SetHeight(bottomHeight)
+
+    textures.topRight:Hide()
+    textures.bottomRight:Hide()
 end
 
 Shell.talentConnectorCoords = {
@@ -1923,10 +1925,13 @@ function Shell:LayoutCharacterOverviewPanel()
 
     for index = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[index]
+        local treeWidth = math.floor((talentsWidth - 36) / 3)
+        local treeHeight = (self.characterOverviewPanel:GetHeight() or 560) - topBottomOffset - 38
+
         tree:ClearAllPoints()
         tree:SetPoint("TOP", overview.talents, "TOP", 0, -30)
         tree:SetPoint("BOTTOM", overview.talents, "BOTTOM", 0, 8)
-        tree:SetWidth(math.floor((talentsWidth - 36) / 3))
+        tree:SetWidth(treeWidth)
 
         if index == 1 then
             tree:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
@@ -1934,7 +1939,7 @@ function Shell:LayoutCharacterOverviewPanel()
             tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
         end
 
-        self:LayoutTalentBackground(tree)
+        self:LayoutTalentBackground(tree, treeWidth - 8, treeHeight - 8)
     end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
