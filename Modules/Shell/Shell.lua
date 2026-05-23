@@ -962,12 +962,18 @@ end
 function Shell:CreatePaperDollSlotButton(parent, slotInfo)
     self.equipmentButtonIndex = (self.equipmentButtonIndex or 0) + 1
 
-    local name = "SableUIEquipmentSlot" .. tostring(self.equipmentButtonIndex)
-    local ok, button = pcall(function()
-        return CreateFrame("Button", name, parent, "PaperDollItemSlotButtonTemplate")
-    end)
+    local name = "SableUI__" .. slotInfo.slot
+    local ok
+    local button
+
+    if not _G[name] then
+        ok, button = pcall(function()
+            return CreateFrame("Button", name, parent, "PaperDollItemSlotButtonTemplate")
+        end)
+    end
 
     if not ok or not button then
+        name = "SableUICustomEquipmentSlot" .. tostring(self.equipmentButtonIndex)
         button = CreateFrame("Button", name, parent)
         button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         button:RegisterForDrag("LeftButton")
