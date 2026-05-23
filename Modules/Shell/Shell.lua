@@ -1551,26 +1551,6 @@ function Shell:CreateTalentTreePanel(parent, index)
     return tree
 end
 
-function Shell:CreateTalentTreeTab(parent, index)
-    local tab = CreateFrame("Button", nil, parent)
-    tab:SetHeight(22)
-    S.Theme:ApplyBackdrop(tab, "panelAlt")
-
-    local text = S.Theme:CreateFontString(tab, "normal", 10, "")
-    text:SetPoint("CENTER", tab, "CENTER", 0, 0)
-    text:SetJustifyH("CENTER")
-    text:SetText("-")
-    tab.text = text
-    tab.index = index
-
-    tab:SetScript("OnClick", function(self)
-        Shell.overviewTalentTab = self.index
-        Shell:RefreshCharacterOverviewIfShown()
-    end)
-
-    return tab
-end
-
 Shell.talentConnectorCoords = {
     branch = {
         top = { left = 0.12890625, width = 0.125, bottom = 0.96875 },
@@ -1597,7 +1577,7 @@ function Shell:SetTalentConnectorCoords(texture, textureType, subtype)
     texture:SetTexCoord(left, left + coords.width, 0, coords.bottom or 1)
 end
 
-function Shell:GetTalentConnectorTexture(tree, textureType, subtype)
+function Shell:GetTalentConnectorTexture(tree, textureType, subtype, isActive)
     tree.connectorIndex = (tree.connectorIndex or 0) + 1
 
     local texture = tree.connectorTextures[tree.connectorIndex]
@@ -1611,8 +1591,13 @@ function Shell:GetTalentConnectorTexture(tree, textureType, subtype)
     texture:SetWidth(32)
     texture:SetHeight(32)
     texture:SetTexture(textureType == "arrow" and "Interface\\Addons\\Talented\\Textures\\arrows-normal" or "Interface\\Addons\\Talented\\Textures\\branches-normal")
-    texture:SetVertexColor(0.9, 0.72, 0.42)
-    texture:SetAlpha(0.85)
+    if isActive then
+        texture:SetVertexColor(1, 0.82, 0.12)
+        texture:SetAlpha(0.95)
+    else
+        texture:SetVertexColor(0.52, 0.52, 0.52)
+        texture:SetAlpha(0.75)
+    end
     self:SetTalentConnectorCoords(texture, textureType, subtype)
     texture:Show()
 
@@ -1634,8 +1619,8 @@ function Shell:GetTalentGridPoint(row, column, buttonSize, xStep, yStep)
     return x, y
 end
 
-function Shell:DrawTalentConnectorSegment(tree, textureType, subtype, x, y, width, height)
-    local texture = self:GetTalentConnectorTexture(tree, textureType, subtype)
+function Shell:DrawTalentConnectorSegment(tree, textureType, subtype, x, y, width, height, isActive)
+    local texture = self:GetTalentConnectorTexture(tree, textureType, subtype, isActive)
 
     texture:SetWidth(width or 32)
     texture:SetHeight(height or 32)
@@ -1651,15 +1636,17 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
 
     local fromX, fromY = self:GetTalentGridPoint(fromTalent.row, fromTalent.column, buttonSize, xStep, yStep)
     local toX, toY = self:GetTalentGridPoint(toTalent.row, toTalent.column, buttonSize, xStep, yStep)
-    local centerOffset = math.floor(buttonSize / 2) - 16
+    local connectorSize = Clamp(buttonSize, 18, 26)
+    local centerOffset = math.floor((buttonSize - connectorSize) / 2)
+    local isActive = fromTalent.rank and fromTalent.maxRank and fromTalent.rank >= fromTalent.maxRank
 
     if fromTalent.column == toTalent.column then
         for row = fromTalent.row + 1, toTalent.row - 1 do
             local x, y = self:GetTalentGridPoint(row, fromTalent.column, buttonSize, xStep, yStep)
-            self:DrawTalentConnectorSegment(tree, "branch", "top", x + centerOffset, y + 8, 32, math.max(32, yStep))
+            self:DrawTalentConnectorSegment(tree, "branch", "top", x + centerOffset, y + 4, connectorSize, math.max(connectorSize, yStep), isActive)
         end
 
-        self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 10, 32, 32)
+        self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
         return
     end
 
@@ -1669,20 +1656,20 @@ function Shell:DrawOverviewTalentConnector(tree, fromTalent, toTalent, buttonSiz
 
         for column = leftColumn + 1, rightColumn - 1 do
             local x, y = self:GetTalentGridPoint(fromTalent.row, column, buttonSize, xStep, yStep)
-            self:DrawTalentConnectorSegment(tree, "branch", "left", x - 8, y + centerOffset, math.max(32, xStep), 32)
+            self:DrawTalentConnectorSegment(tree, "branch", "left", x - 4, y + centerOffset, math.max(connectorSize, xStep), connectorSize, isActive)
         end
 
         if fromTalent.column < toTalent.column then
-            self:DrawTalentConnectorSegment(tree, "arrow", "right", toX - buttonSize, toY + centerOffset, 32, 32)
+            self:DrawTalentConnectorSegment(tree, "arrow", "right", toX - connectorSize, toY + centerOffset, connectorSize, connectorSize, isActive)
         else
-            self:DrawTalentConnectorSegment(tree, "arrow", "left", toX + buttonSize - 8, toY + centerOffset, 32, 32)
+            self:DrawTalentConnectorSegment(tree, "arrow", "left", toX + buttonSize - 4, toY + centerOffset, connectorSize, connectorSize, isActive)
         end
         return
     end
 
-    self:DrawTalentConnectorSegment(tree, "branch", "top", fromX + centerOffset, fromY + buttonSize - 4, 32, math.max(32, yStep))
-    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", toX + centerOffset, fromY + yStep - 4, 32, 32)
-    self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 10, 32, 32)
+    self:DrawTalentConnectorSegment(tree, "branch", "top", fromX + centerOffset, fromY + buttonSize - 4, connectorSize, math.max(connectorSize, yStep), isActive)
+    self:DrawTalentConnectorSegment(tree, "branch", fromTalent.column < toTalent.column and "topleft" or "topright", toX + centerOffset, fromY + yStep - 4, connectorSize, connectorSize, isActive)
+    self:DrawTalentConnectorSegment(tree, "arrow", "top", toX + centerOffset, toY + buttonSize - 8, connectorSize, connectorSize, isActive)
 end
 
 function Shell:GetBagRange()
@@ -1797,12 +1784,6 @@ function Shell:CreateCharacterOverviewPanel()
     talentsTitle:SetPoint("TOPLEFT", talents, "TOPLEFT", 10, -8)
     talentsTitle:SetText("Talents")
 
-    local talentTabs = {}
-
-    for index = 1, 3 do
-        talentTabs[index] = self:CreateTalentTreeTab(talents, index)
-    end
-
     local talentTrees = {}
 
     for index = 1, 3 do
@@ -1841,7 +1822,6 @@ function Shell:CreateCharacterOverviewPanel()
         modelPanel = modelPanel,
         model = model,
         bagButtons = bagButtons,
-        talentTabs = talentTabs,
         talentTrees = talentTrees,
         inventorySummary = inventorySummary,
         summary = summary,
@@ -1917,24 +1897,18 @@ function Shell:LayoutCharacterOverviewPanel()
     overview.talents:SetPoint("BOTTOMRIGHT", self.characterOverviewPanel, "BOTTOMRIGHT", 0, topBottomOffset)
     overview.talents:Show()
 
-    for index = 1, table.getn(overview.talentTabs) do
-        local tab = overview.talentTabs[index]
-        tab:ClearAllPoints()
-        tab:SetWidth(math.floor((talentsWidth - 36) / 3))
-
-        if index == 1 then
-            tab:SetPoint("TOPLEFT", overview.talents, "TOPLEFT", 10, -28)
-        else
-            tab:SetPoint("LEFT", overview.talentTabs[index - 1], "RIGHT", 8, 0)
-        end
-    end
-
     for index = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[index]
         tree:ClearAllPoints()
-        tree:SetPoint("TOPLEFT", overview.talents, "TOPLEFT", 10, -58)
-        tree:SetPoint("RIGHT", overview.talents, "RIGHT", -10, 0)
+        tree:SetPoint("TOP", overview.talents, "TOP", 0, -30)
         tree:SetPoint("BOTTOM", overview.talents, "BOTTOM", 0, 8)
+        tree:SetWidth(math.floor((talentsWidth - 36) / 3))
+
+        if index == 1 then
+            tree:SetPoint("LEFT", overview.talents, "LEFT", 10, 0)
+        else
+            tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
+        end
     end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
@@ -2048,43 +2022,6 @@ function Shell:UpdateCharacterOverviewTalents()
 
     local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup() or 1
     local unspent = GetUnspentTalentPoints and GetUnspentTalentPoints(nil, false, activeGroup) or nil
-    local selectedTab = self.overviewTalentTab
-    local selectedPoints = -1
-
-    for tab = 1, table.getn(overview.talentTrees) do
-        local name
-        local points
-
-        if GetTalentTabInfo then
-            name, _, points = GetTalentTabInfo(tab, false, false, activeGroup)
-        end
-
-        points = tonumber(points) or 0
-
-        if overview.talentTabs and overview.talentTabs[tab] then
-            overview.talentTabs[tab].text:SetText((name or ("Tree " .. tostring(tab))) .. " (" .. tostring(points) .. ")")
-        end
-
-        if not selectedTab and points > selectedPoints then
-            selectedPoints = points
-            selectedTab = tab
-        end
-    end
-
-    selectedTab = selectedTab or 1
-    self.overviewTalentTab = selectedTab
-
-    for tab = 1, table.getn(overview.talentTabs or {}) do
-        local tabButton = overview.talentTabs[tab]
-
-        if tab == selectedTab then
-            tabButton:SetBackdropBorderColor(S.Theme:GetColor("accent"))
-            tabButton.text:SetTextColor(S.Theme:GetColor("accent"))
-        else
-            tabButton:SetBackdropBorderColor(S.Theme:GetColor("border"))
-            S.Theme:ApplyTextColor(tabButton.text, "textMuted")
-        end
-    end
 
     for tab = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[tab]
@@ -2104,7 +2041,7 @@ function Shell:UpdateCharacterOverviewTalents()
             tree.backgroundTextures.topRight:SetTexture("Interface\\TalentFrame\\" .. backgroundName .. "-TopRight")
             tree.backgroundTextures.bottomLeft:SetTexture("Interface\\TalentFrame\\" .. backgroundName .. "-BottomLeft")
             tree.backgroundTextures.bottomRight:SetTexture("Interface\\TalentFrame\\" .. backgroundName .. "-BottomRight")
-            tree.background:SetAlpha(0.42)
+            tree.background:SetAlpha(0.58)
         end
 
         if unspent then
@@ -2113,17 +2050,7 @@ function Shell:UpdateCharacterOverviewTalents()
             tree.points:SetText(tostring(points or 0) .. " spent")
         end
 
-        if tab ~= selectedTab then
-            tree:Hide()
-            self:HideUnusedTalentConnectors(tree)
-            for index = 1, table.getn(tree.buttons) do
-                tree.buttons[index]:Hide()
-            end
-        else
-            tree:Show()
-        end
-
-        if tab == selectedTab then
+        tree:Show()
         local numTalents = GetNumTalents and GetNumTalents(tab, false, false) or 0
         local gridWidth = tree.grid:GetWidth() or 120
         local gridHeight = tree.grid:GetHeight() or 260
@@ -2152,6 +2079,8 @@ function Shell:UpdateCharacterOverviewTalents()
             talentPositions[index] = {
                 row = row,
                 column = column,
+                rank = displayRank,
+                maxRank = maxRank,
             }
 
             button:SetWidth(buttonSize)
@@ -2213,7 +2142,6 @@ function Shell:UpdateCharacterOverviewTalents()
 
         for index = numTalents + 1, table.getn(tree.buttons) do
             tree.buttons[index]:Hide()
-        end
         end
     end
 end
