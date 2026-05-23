@@ -1496,19 +1496,15 @@ function Shell:CreateTalentTreePanel(parent, index)
 
     local topLeft = background:CreateTexture(nil, "BACKGROUND")
     topLeft:SetPoint("TOPLEFT", background, "TOPLEFT", 0, 0)
-    topLeft:SetPoint("BOTTOMRIGHT", background, "CENTER", 0, 0)
 
     local topRight = background:CreateTexture(nil, "BACKGROUND")
-    topRight:SetPoint("TOPLEFT", background, "TOP", 0, 0)
-    topRight:SetPoint("BOTTOMRIGHT", background, "RIGHT", 0, 0)
+    topRight:SetPoint("TOPLEFT", topLeft, "TOPRIGHT", 0, 0)
 
     local bottomLeft = background:CreateTexture(nil, "BACKGROUND")
-    bottomLeft:SetPoint("TOPLEFT", background, "LEFT", 0, 0)
-    bottomLeft:SetPoint("BOTTOMRIGHT", background, "BOTTOM", 0, 0)
+    bottomLeft:SetPoint("TOPLEFT", topLeft, "BOTTOMLEFT", 0, 0)
 
     local bottomRight = background:CreateTexture(nil, "BACKGROUND")
-    bottomRight:SetPoint("TOPLEFT", background, "CENTER", 0, 0)
-    bottomRight:SetPoint("BOTTOMRIGHT", background, "BOTTOMRIGHT", 0, 0)
+    bottomRight:SetPoint("TOPLEFT", topLeft, "BOTTOMRIGHT", 0, 0)
 
     local connectors = CreateFrame("Frame", nil, tree)
     connectors:SetPoint("TOPLEFT", background, "TOPLEFT", 0, 0)
@@ -1549,6 +1545,34 @@ function Shell:CreateTalentTreePanel(parent, index)
     tree.buttons = {}
 
     return tree
+end
+
+function Shell:LayoutTalentBackground(tree)
+    if not tree or not tree.background or not tree.backgroundTextures then
+        return
+    end
+
+    local width = tree.background:GetWidth() or 0
+    local height = tree.background:GetHeight() or 0
+
+    if width <= 0 or height <= 0 then
+        return
+    end
+
+    local leftWidth = math.floor(width * (256 / 320))
+    local rightWidth = width - leftWidth
+    local topHeight = math.floor(height * (256 / 384))
+    local bottomHeight = height - topHeight
+    local textures = tree.backgroundTextures
+
+    textures.topLeft:SetWidth(leftWidth)
+    textures.topLeft:SetHeight(topHeight)
+    textures.topRight:SetWidth(rightWidth)
+    textures.topRight:SetHeight(topHeight)
+    textures.bottomLeft:SetWidth(leftWidth)
+    textures.bottomLeft:SetHeight(bottomHeight)
+    textures.bottomRight:SetWidth(rightWidth)
+    textures.bottomRight:SetHeight(bottomHeight)
 end
 
 Shell.talentConnectorCoords = {
@@ -2042,6 +2066,7 @@ function Shell:UpdateCharacterOverviewTalents()
             tree.backgroundTextures.bottomLeft:SetTexture("Interface\\TalentFrame\\" .. backgroundName .. "-BottomLeft")
             tree.backgroundTextures.bottomRight:SetTexture("Interface\\TalentFrame\\" .. backgroundName .. "-BottomRight")
             tree.background:SetAlpha(0.58)
+            self:LayoutTalentBackground(tree)
         end
 
         if unspent then
