@@ -1926,7 +1926,8 @@ function Shell:LayoutCharacterOverviewPanel()
     for index = 1, table.getn(overview.talentTrees) do
         local tree = overview.talentTrees[index]
         local treeWidth = math.floor((talentsWidth - 36) / 3)
-        local treeHeight = (self.characterOverviewPanel:GetHeight() or 560) - topBottomOffset - 38
+        local talentsHeight = (overview.talents:GetHeight() and overview.talents:GetHeight() > 0) and overview.talents:GetHeight() or ((self.characterOverviewPanel:GetHeight() or 560) - topBottomOffset)
+        local treeHeight = talentsHeight - 38
 
         tree:ClearAllPoints()
         tree:SetPoint("TOP", overview.talents, "TOP", 0, -30)
@@ -1939,7 +1940,7 @@ function Shell:LayoutCharacterOverviewPanel()
             tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
         end
 
-        self:LayoutTalentBackground(tree, treeWidth - 8, treeHeight - 8)
+        self:LayoutTalentBackground(tree, treeWidth - 8, treeHeight)
     end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
