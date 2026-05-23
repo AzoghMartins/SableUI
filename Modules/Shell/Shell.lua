@@ -1490,8 +1490,8 @@ function Shell:CreateTalentTreePanel(parent, index)
     S.Theme:ApplyBackdrop(tree, "panelAlt")
 
     local background = CreateFrame("Frame", nil, tree)
-    background:SetPoint("TOPLEFT", tree, "TOPLEFT", 8, -38)
-    background:SetPoint("BOTTOMRIGHT", tree, "BOTTOMRIGHT", -8, 8)
+    background:SetPoint("TOPLEFT", tree, "TOPLEFT", 4, -4)
+    background:SetPoint("BOTTOMRIGHT", tree, "BOTTOMRIGHT", -4, 4)
     background:SetFrameLevel(tree:GetFrameLevel() + 1)
 
     local topLeft = background:CreateTexture(nil, "BACKGROUND")
@@ -1507,8 +1507,8 @@ function Shell:CreateTalentTreePanel(parent, index)
     bottomRight:SetPoint("TOPLEFT", topLeft, "BOTTOMRIGHT", 0, 0)
 
     local connectors = CreateFrame("Frame", nil, tree)
-    connectors:SetPoint("TOPLEFT", background, "TOPLEFT", 0, 0)
-    connectors:SetPoint("BOTTOMRIGHT", background, "BOTTOMRIGHT", 0, 0)
+    connectors:SetPoint("TOPLEFT", tree, "TOPLEFT", 8, -38)
+    connectors:SetPoint("BOTTOMRIGHT", tree, "BOTTOMRIGHT", -8, 8)
     connectors:SetFrameLevel(tree:GetFrameLevel() + 2)
 
     local title = S.Theme:CreateFontString(tree, "bold", 11, "")
@@ -1525,8 +1525,8 @@ function Shell:CreateTalentTreePanel(parent, index)
     S.Theme:ApplyTextColor(points, "textMuted")
 
     local grid = CreateFrame("Frame", nil, tree)
-    grid:SetPoint("TOPLEFT", background, "TOPLEFT", 0, 0)
-    grid:SetPoint("BOTTOMRIGHT", background, "BOTTOMRIGHT", 0, 0)
+    grid:SetPoint("TOPLEFT", tree, "TOPLEFT", 8, -38)
+    grid:SetPoint("BOTTOMRIGHT", tree, "BOTTOMRIGHT", -8, 8)
     grid:SetFrameLevel(tree:GetFrameLevel() + 3)
 
     tree.index = index
@@ -1933,6 +1933,8 @@ function Shell:LayoutCharacterOverviewPanel()
         else
             tree:SetPoint("LEFT", overview.talentTrees[index - 1], "RIGHT", 8, 0)
         end
+
+        self:LayoutTalentBackground(tree)
     end
 
     local rowWidth = Clamp(math.floor((gearWidth - 278) / 2), 150, 190)
