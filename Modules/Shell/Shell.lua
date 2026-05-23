@@ -959,28 +959,69 @@ function Shell:UseBagSlot(bag, slot)
     return true
 end
 
-function Shell:CreateEquipmentRow(parent, slotInfo, width)
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetWidth(width or 252)
-    row:SetHeight(46)
-    S.Theme:ApplyBackdrop(row, "panel")
+function Shell:CreatePaperDollSlotButton(parent, slotInfo)
+    self.equipmentButtonIndex = (self.equipmentButtonIndex or 0) + 1
 
-    local icon = CreateFrame("Button", nil, row)
-    icon:SetWidth(36)
-    icon:SetHeight(36)
-    icon:SetPoint("LEFT", row, "LEFT", 6, 0)
-    icon:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    icon:RegisterForDrag("LeftButton")
-    S.Theme:ApplyBackdrop(icon, "panelAlt")
-    icon.slotName = slotInfo.slot
-    icon.slotID = self:GetInventorySlotID(slotInfo.slot)
+    local name = "SableUIEquipmentSlot" .. tostring(self.equipmentButtonIndex)
+    local ok, button = pcall(function()
+        return CreateFrame("Button", name, parent, "PaperDollItemSlotButtonTemplate")
+    end)
 
-    icon.texture = icon:CreateTexture(nil, "ARTWORK")
-    icon.texture:SetPoint("TOPLEFT", icon, "TOPLEFT", 3, -3)
-    icon.texture:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -3, 3)
-    icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if not ok or not button then
+        button = CreateFrame("Button", name, parent)
+        button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        button:RegisterForDrag("LeftButton")
+        button:SetScript("OnClick", function(self, mouseButton)
+            if self.dragging then
+                self.dragging = nil
+                return
+            end
 
-    icon:SetScript("OnEnter", function(self)
+            local link = GetInventoryItemLink and GetInventoryItemLink("player", self.slotID) or nil
+
+            if Shell:HandleItemModifiedClick(link) then
+                return
+            end
+
+            if mouseButton == "LeftButton" then
+                if Shell:IsInventorySlotTargeting() then
+                    Shell:UseInventorySlot(self.slotID)
+                    return
+                end
+
+                Shell:PickupInventorySlot(self.slotID)
+            elseif mouseButton == "RightButton" then
+                Shell:UseInventorySlot(self.slotID)
+            end
+        end)
+        button:SetScript("OnDragStart", function(self)
+            self.dragging = true
+            Shell:PickupInventorySlot(self.slotID)
+        end)
+        button:SetScript("OnReceiveDrag", function(self)
+            Shell:PickupInventorySlot(self.slotID)
+        end)
+    end
+
+    button:SetWidth(36)
+    button:SetHeight(36)
+    button:SetPoint("LEFT", parent, "LEFT", 6, 0)
+    button:SetID(self:GetInventorySlotID(slotInfo.slot) or 0)
+    button.slotName = slotInfo.slot
+    button.slotID = self:GetInventorySlotID(slotInfo.slot)
+
+    S.Theme:ApplyBackdrop(button, "panelAlt")
+    button:SetNormalTexture(nil)
+    button:SetPushedTexture(nil)
+    button:SetHighlightTexture(nil)
+    button:SetCheckedTexture(nil)
+
+    button.texture = _G[name .. "IconTexture"] or button:CreateTexture(nil, "ARTWORK")
+    button.texture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
+    button.texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
+    button.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button:SetScript("OnEnter", function(self)
         if not self.slotID or not GameTooltip then
             return
         end
@@ -995,41 +1036,22 @@ function Shell:CreateEquipmentRow(parent, slotInfo, width)
 
         GameTooltip:Show()
     end)
-    icon:SetScript("OnLeave", function()
+    button:SetScript("OnLeave", function()
         if GameTooltip then
             GameTooltip:Hide()
         end
     end)
-    icon:SetScript("OnClick", function(self, button)
-        if self.dragging then
-            self.dragging = nil
-            return
-        end
 
-        local link = GetInventoryItemLink and GetInventoryItemLink("player", self.slotID) or nil
+    return button
+end
 
-        if Shell:HandleItemModifiedClick(link) then
-            return
-        end
+function Shell:CreateEquipmentRow(parent, slotInfo, width)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetWidth(width or 252)
+    row:SetHeight(46)
+    S.Theme:ApplyBackdrop(row, "panel")
 
-        if button == "LeftButton" then
-            if Shell:IsInventorySlotTargeting() then
-                Shell:UseInventorySlot(self.slotID)
-                return
-            end
-
-            Shell:PickupInventorySlot(self.slotID)
-        elseif button == "RightButton" then
-            Shell:UseInventorySlot(self.slotID)
-        end
-    end)
-    icon:SetScript("OnDragStart", function(self)
-        self.dragging = true
-        Shell:PickupInventorySlot(self.slotID)
-    end)
-    icon:SetScript("OnReceiveDrag", function(self)
-        Shell:PickupInventorySlot(self.slotID)
-    end)
+    local icon = self:CreatePaperDollSlotButton(row, slotInfo)
 
     local label = S.Theme:CreateFontString(row, "normal", 10, "")
     label:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, -5)
